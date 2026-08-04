@@ -383,9 +383,9 @@ async function cargarGastos() {
         </div>
       `).join('')}
     </div>
-    <div class="recent-label" style="margin-top:0;">Movimientos</div>
+    <div class="recent-label" style="margin-top:0;">Movimientos <span style="font-weight:400; text-transform:none; letter-spacing:0;">(toca uno para corregirlo)</span></div>
     ${data.map((g) => `
-      <div class="gasto-row">
+      <div class="gasto-row" style="cursor:pointer;" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}">
         <div class="gasto-left">
           <div class="gasto-dot" style="background:${colorCategoria(g.categorias?.nombre)}"></div>
           <div class="gasto-info">
@@ -398,6 +398,10 @@ async function cargarGastos() {
     `).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>'}
   `;
 
+  cont.querySelectorAll('.gasto-row').forEach((row) => {
+    row.addEventListener('click', () => editarGasto(row));
+  });
+
   document.getElementById('add-ingreso-btn').addEventListener('click', async () => {
     const input = document.getElementById('ingreso-importe');
     const importe = parseFloat(input.value);
@@ -408,6 +412,28 @@ async function cargarGastos() {
     });
     cargarGastos();
   });
+}
+
+async function editarGasto(row) {
+  const { gastoId, categoriaId, importe, descripcion } = row.dataset;
+  const activas = categoriasCache.filter((c) => c.activa);
+  const actual = activas.findIndex((c) => c.id === categoriaId);
+
+  const listado = activas.map((c, i) => `${i + 1}. ${c.nombre}${i === actual ? ' (actual)' : ''}`).join('\n');
+  const eleccion = prompt(`Corregir categoría de "${descripcion}":\n\n${listado}\n\nEscribe el número:`, actual >= 0 ? String(actual + 1) : '1');
+  if (eleccion === null) return;
+  const nuevaCategoria = activas[parseInt(eleccion) - 1];
+  if (!nuevaCategoria) { alert('Número no válido'); return; }
+
+  const nuevoImporte = prompt('Importe:', importe);
+  if (nuevoImporte === null) return;
+
+  await sb.from('gastos').update({
+    categoria_id: nuevaCategoria.id,
+    importe: parseFloat(nuevoImporte) || parseFloat(importe),
+  }).eq('id', gastoId);
+
+  cargarGastos();
 }
 
 // ---------------- FIJOS ----------------
