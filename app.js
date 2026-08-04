@@ -594,9 +594,9 @@ async function cargarFijos() {
 
     return `
       <div class="fijo-card">
-        <div class="fijo-top">
+        <div class="fijo-top" style="cursor:pointer;" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}">
           <div>
-            <div class="fijo-name">${f.nombre}</div>
+            <div class="fijo-name">${f.nombre} <span style="font-size:10px; color:var(--tinta-suave);">✎</span></div>
             <div class="fijo-cat"><span class="fijo-cat-dot" style="background:${colorCategoria(f.categorias?.nombre)}"></span>${f.categorias?.nombre || ''} · día ${f.dia_cobro}</div>
           </div>
           <div class="fijo-amt">${f.importe_es_fijo ? euros(f.importe_estimado) : '~' + euros(f.importe_estimado)}${f.importe_es_fijo ? '' : '<span class="approx">estimado</span>'}</div>
@@ -609,12 +609,45 @@ async function cargarFijos() {
     `;
   }).join('') || '<div class="empty-state">Todavía no tienes gastos fijos. Añade uno abajo.</div>';
 
+  cont.querySelectorAll('.fijo-top').forEach((el) => {
+    el.addEventListener('click', () => editarFijo(el));
+  });
   cont.querySelectorAll('.fijo-badge:not([disabled])').forEach((btn) => {
     btn.addEventListener('click', () => marcarFijoPagado(btn));
   });
   cont.querySelectorAll('.cal-chip').forEach((btn) => {
     btn.addEventListener('click', () => abrirCalendario(btn.dataset.nombre, parseInt(btn.dataset.dia)));
   });
+}
+
+async function editarFijo(el) {
+  const { fijoId, nombre, categoriaId, importe, dia } = el.dataset;
+  const activas = categoriasCache.filter((c) => c.activa);
+  const actual = activas.findIndex((c) => c.id === categoriaId);
+
+  const listado = activas.map((c, i) => `${i + 1}. ${c.nombre}${i === actual ? ' (actual)' : ''}`).join('\n');
+  const eleccion = prompt(`Corregir categoría de "${nombre}":\n\n${listado}\n\nEscribe el número:`, actual >= 0 ? String(actual + 1) : '1');
+  if (eleccion === null) return;
+  const nuevaCategoria = activas[parseInt(eleccion) - 1];
+  if (!nuevaCategoria) { alert('Número no válido'); return; }
+
+  const nuevoNombre = prompt('Nombre:', nombre);
+  if (nuevoNombre === null) return;
+
+  const nuevoImporte = prompt('Importe estimado:', importe);
+  if (nuevoImporte === null) return;
+
+  const nuevoDia = prompt('Día del mes:', dia);
+  if (nuevoDia === null) return;
+
+  await sb.from('gastos_fijos').update({
+    nombre: nuevoNombre.trim() || nombre,
+    categoria_id: nuevaCategoria.id,
+    importe_estimado: parseFloat(nuevoImporte) || parseFloat(importe),
+    dia_cobro: parseInt(nuevoDia) || parseInt(dia),
+  }).eq('id', fijoId);
+
+  cargarFijos();
 }
 
 async function marcarFijoPagado(btn) {
