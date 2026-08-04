@@ -53,6 +53,7 @@ document.getElementById('logout-btn').addEventListener('click', async (e) => {
 async function mostrarApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  document.getElementById('version-tag').textContent = 'v' + CONFIG.APP_VERSION;
   await cargarCategorias();
   await cargarRecientes();
   poblarSelectCategoriaFijo();
@@ -318,6 +319,8 @@ async function conformarTicket() {
 }
 
 // ---------------- GASTOS (resumen mensual) ----------------
+let chartCategorias = null;
+
 async function cargarGastos() {
   const hoy = new Date();
   const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
@@ -335,6 +338,12 @@ async function cargarGastos() {
     .select('*').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
   const totalIngresos = (ingresos || []).reduce((a, i) => a + Number(i.importe), 0);
 
+  // Tickets confirmados del mes, para mostrar el nombre del comercio en el desplegable
+  const { data: ticketsMes } = await sb.from('tickets')
+    .select('id, comercio, fecha').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
+  const comercioPorTicket = {};
+  (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
+
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
   const fijo = data.filter((g) => g.origen === 'fijo').reduce((a, g) => a + Number(g.importe), 0);
   const variable = total - fijo;
@@ -348,6 +357,30 @@ async function cargarGastos() {
   const maxCat = Math.max(1, ...Object.values(porCategoria));
 
   const nombreMes = hoy.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+  // Agrupar gastos de origen 'ticket' por ticket_id; el resto (fijo/manual) va suelto
+  const movimientos = [];
+  const gruposTicket = {};
+  data.forEach((g) => {
+    if (g.origen === 'ticket' && g.ticket_id) {
+      if (!gruposTicket[g.ticket_id]) {
+        gruposTicket[g.ticket_id] = {
+          tipo: 'ticket', ticketId: g.ticket_id, fecha: g.fecha,
+          comercio: comercioPorTicket[g.ticket_id] || 'Ticket', total: 0, items: [],
+        };
+        movimientos.push(gruposTicket[g.ticket_id]);
+      }
+      gruposTicket[g.ticket_id].total += Number(g.importe);
+      gruposTicket[g.ticket_id].items.push(g);
+    } else {
+      movimientos.push({ tipo: 'simple', gasto: g });
+    }
+  });
+  movimientos.sort((a, b) => {
+    const fa = a.tipo === 'ticket' ? a.fecha : a.gasto.fecha;
+    const fb = b.tipo === 'ticket' ? b.fecha : b.gasto.fecha;
+    return fb.localeCompare(fa);
+  });
 
   const cont = document.getElementById('gastos-content');
   cont.innerHTML = `
@@ -368,6 +401,17 @@ async function cargarGastos() {
       <button id="add-ingreso-btn">Añadir</button>
     </div>
 
+    <div class="add-fijo" id="add-manual-form">
+      <div class="capture-sub" style="margin-bottom:0;">Gasto imprevisto</div>
+      <input type="text" id="manual-descripcion" placeholder="¿Qué has pagado?">
+      <div class="add-fijo-row">
+        <input type="number" id="manual-importe" placeholder="Importe €" step="0.01">
+        <input type="date" id="manual-fecha" value="${new Date().toISOString().split('T')[0]}">
+      </div>
+      <select id="manual-categoria"></select>
+      <button id="add-manual-btn">Añadir gasto</button>
+    </div>
+
     <div class="summary-card">
       <div class="summary-total-label">Total de gastos</div>
       <div class="summary-total-amt">${euros(total)}</div>
@@ -375,6 +419,7 @@ async function cargarGastos() {
         <div class="split-box"><div class="split-label">📌 Fijo</div><div class="split-amt">${euros(fijo)}</div></div>
         <div class="split-box variable"><div class="split-label">🧾 Variable</div><div class="split-amt">${euros(variable)}</div></div>
       </div>
+      <div class="chart-wrap"><canvas id="chart-categorias"></canvas></div>
       ${Object.entries(porCategoria).map(([nombre, importe]) => `
         <div class="bar-row">
           <div class="bar-label">${nombre}</div>
@@ -383,25 +428,93 @@ async function cargarGastos() {
         </div>
       `).join('')}
     </div>
+
     <div class="recent-label" style="margin-top:0;">Movimientos <span style="font-weight:400; text-transform:none; letter-spacing:0;">(toca uno para corregirlo)</span></div>
-    ${data.map((g) => `
-      <div class="gasto-row" style="cursor:pointer;" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}">
-        <div class="gasto-left">
-          <div class="gasto-dot" style="background:${colorCategoria(g.categorias?.nombre)}"></div>
-          <div class="gasto-info">
-            <div class="gasto-name">${g.descripcion}</div>
-            <div class="gasto-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+    ${movimientos.map((m) => {
+      if (m.tipo === 'ticket') {
+        return `
+          <div class="ticket-group" data-ticket-id="${m.ticketId}">
+            <div class="ticket-group-header">
+              <div class="ticket-group-info">
+                <span class="chevron">▾</span>
+                <div>
+                  <div class="ticket-group-name">${m.comercio}</div>
+                  <div class="ticket-group-date">${new Date(m.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+                </div>
+              </div>
+              <div class="ticket-group-amt">${euros(m.total)}</div>
+            </div>
+            <div class="ticket-group-detail">
+              ${m.items.map((it) => `
+                <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${it.descripcion}">
+                  <span><span class="cat-dot-inline" style="background:${colorCategoria(it.categorias?.nombre)}"></span>${it.descripcion.split(' — ').slice(1).join(' — ') || it.descripcion}</span>
+                  <span>${euros(it.importe)}</span>
+                </div>
+              `).join('')}
+            </div>
           </div>
+        `;
+      }
+      const g = m.gasto;
+      return `
+        <div class="gasto-row" style="cursor:pointer;" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}">
+          <div class="gasto-left">
+            <div class="gasto-dot" style="background:${colorCategoria(g.categorias?.nombre)}"></div>
+            <div class="gasto-info">
+              <div class="gasto-name">${g.descripcion}</div>
+              <div class="gasto-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+            </div>
+          </div>
+          <div class="gasto-amt">${euros(g.importe)}</div>
         </div>
-        <div class="gasto-amt">${euros(g.importe)}</div>
-      </div>
-    `).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>'}
+      `;
+    }).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>'}
   `;
 
+  // Desplegar/plegar tickets
+  cont.querySelectorAll('.ticket-group-header').forEach((header) => {
+    header.addEventListener('click', () => {
+      header.closest('.ticket-group').classList.toggle('open');
+    });
+  });
+
+  // Editar línea individual dentro de un ticket desplegado
+  cont.querySelectorAll('.ticket-item-row').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editarGasto(row);
+    });
+  });
+
+  // Editar gasto suelto (fijo/manual)
   cont.querySelectorAll('.gasto-row').forEach((row) => {
     row.addEventListener('click', () => editarGasto(row));
   });
 
+  // Gráfica de categorías
+  const canvas = document.getElementById('chart-categorias');
+  if (chartCategorias) chartCategorias.destroy();
+  if (canvas && Object.keys(porCategoria).length) {
+    chartCategorias = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(porCategoria),
+        datasets: [{
+          data: Object.values(porCategoria),
+          backgroundColor: Object.keys(porCategoria).map(colorCategoria),
+          borderColor: '#F5F2E9',
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: '#211F1B' } },
+        },
+      },
+    });
+  }
+
+  // Formulario ingreso
   document.getElementById('add-ingreso-btn').addEventListener('click', async () => {
     const input = document.getElementById('ingreso-importe');
     const importe = parseFloat(input.value);
@@ -410,6 +523,30 @@ async function cargarGastos() {
       fecha: new Date().toISOString().split('T')[0],
       importe, descripcion: 'Nómina',
     });
+    cargarGastos();
+  });
+
+  // Formulario gasto imprevisto
+  const selManual = document.getElementById('manual-categoria');
+  selManual.innerHTML = categoriasCache.filter((c) => c.activa)
+    .map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('');
+
+  document.getElementById('add-manual-btn').addEventListener('click', async () => {
+    const descripcion = document.getElementById('manual-descripcion').value.trim();
+    const importe = parseFloat(document.getElementById('manual-importe').value);
+    const fecha = document.getElementById('manual-fecha').value;
+    const categoriaId = selManual.value;
+
+    if (!descripcion || !importe || !fecha || !categoriaId) {
+      alert('Rellena qué has pagado, el importe y la fecha.');
+      return;
+    }
+
+    await sb.from('gastos').insert({
+      fecha, importe, categoria_id: categoriaId, descripcion,
+      origen: 'manual', estado: 'confirmado',
+    });
+
     cargarGastos();
   });
 }
@@ -542,4 +679,11 @@ init();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js');
+
+  let recargando = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (recargando) return;
+    recargando = true;
+    window.location.reload();
+  });
 }
