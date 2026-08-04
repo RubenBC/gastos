@@ -331,9 +331,14 @@ async function cargarGastos() {
 
   if (error) { console.error(error); return; }
 
+  const { data: ingresos } = await sb.from('ingresos')
+    .select('*').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
+  const totalIngresos = (ingresos || []).reduce((a, i) => a + Number(i.importe), 0);
+
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
   const fijo = data.filter((g) => g.origen === 'fijo').reduce((a, g) => a + Number(g.importe), 0);
   const variable = total - fijo;
+  const ahorro = totalIngresos - total;
 
   const porCategoria = {};
   data.forEach((g) => {
@@ -347,8 +352,24 @@ async function cargarGastos() {
   const cont = document.getElementById('gastos-content');
   cont.innerHTML = `
     <div class="month-title">${nombreMes}</div>
+
+    <div class="ahorro-card">
+      <div>
+        <div class="ahorro-label">Ahorro del mes</div>
+        <div class="ahorro-amt ${ahorro >= 0 ? 'positivo' : 'negativo'}">${euros(ahorro)}</div>
+      </div>
+      <div style="text-align:right; font-size:11px; color:var(--tinta-suave);">
+        Ingresos: ${euros(totalIngresos)}<br>Gastos: ${euros(total)}
+      </div>
+    </div>
+
+    <div class="add-ingreso">
+      <input type="number" id="ingreso-importe" placeholder="Importe de nómina €" step="0.01">
+      <button id="add-ingreso-btn">Añadir</button>
+    </div>
+
     <div class="summary-card">
-      <div class="summary-total-label">Total del mes</div>
+      <div class="summary-total-label">Total de gastos</div>
       <div class="summary-total-amt">${euros(total)}</div>
       <div class="split-row">
         <div class="split-box"><div class="split-label">📌 Fijo</div><div class="split-amt">${euros(fijo)}</div></div>
@@ -376,6 +397,17 @@ async function cargarGastos() {
       </div>
     `).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>'}
   `;
+
+  document.getElementById('add-ingreso-btn').addEventListener('click', async () => {
+    const input = document.getElementById('ingreso-importe');
+    const importe = parseFloat(input.value);
+    if (!importe) return;
+    await sb.from('ingresos').insert({
+      fecha: new Date().toISOString().split('T')[0],
+      importe, descripcion: 'Nómina',
+    });
+    cargarGastos();
+  });
 }
 
 // ---------------- FIJOS ----------------
