@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gastos</title>
+<link rel="manifest" href="./manifest.json?v=1.0.0">
+<meta name="theme-color" content="#2B2E2C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --acero:#2B2E2C; --acero-2:#353835; --lampara:#E8A33D;
+    --papel:#F5F2E9; --papel-sombra:#E4E0D3; --tinta:#211F1B; --tinta-suave:#6B675F;
+    --confirmado:#4C6B4F; --alerta:#B23A2E; --linea:#D8D3C4;
+    --cat-alimentacion:#4C6B4F; --cat-transporte:#3E5C76; --cat-ocio:#C07A2C;
+    --cat-salud:#A13D3D; --cat-hogar:#7A5C3E; --cat-ropa:#5C4A66;
+    --cat-suministros:#2E6E6A; --cat-otros:#6B675F;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--acero); font-family:'Inter',sans-serif; min-height:100vh; display:flex; flex-direction:column;}
+
+  /* ---------- LOGIN ---------- */
+  #login-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .login-card{
+    background:var(--papel); border-radius:12px; padding:28px 24px; width:100%; max-width:340px;
+    box-shadow:0 18px 30px -12px rgba(0,0,0,0.5);
+  }
+  .login-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:24px; color:var(--tinta); margin-bottom:4px;}
+  .login-sub{font-size:12.5px; color:var(--tinta-suave); margin-bottom:20px;}
+  .login-card input{
+    width:100%; padding:12px 13px; border-radius:8px; border:1.5px solid var(--linea);
+    background:#fff; font-size:14px; margin-bottom:10px; font-family:'Inter',sans-serif;
+  }
+  .login-card button{
+    width:100%; padding:13px; border-radius:8px; border:none; background:var(--confirmado);
+    color:#F0F4EF; font-family:'Oswald',sans-serif; font-weight:600; font-size:14px;
+    letter-spacing:0.03em; text-transform:uppercase; margin-top:6px;
+  }
+  #login-error{color:var(--alerta); font-size:12px; margin-top:8px; display:none;}
+
+  /* ---------- APP SHELL ---------- */
+  #app{display:none; flex-direction:column; min-height:100vh;}
+  .topbar{
+    padding:18px 20px 14px; display:flex; align-items:center; gap:10px;
+    border-bottom:1px solid rgba(255,255,255,0.06); position:sticky; top:0; background:var(--acero); z-index:5;
+  }
+  .topbar .clip{width:20px; height:14px; border:2.5px solid var(--lampara); border-radius:3px;}
+  .wordmark{font-family:'Oswald',sans-serif; font-weight:600; font-size:17px; letter-spacing:0.06em; color:#F0EDE4; text-transform:uppercase;}
+  .wordmark span{color:var(--lampara);}
+  .logout-link{margin-left:auto; font-size:11px; color:#8d918d; text-decoration:underline;}
+
+  .screen{padding:20px 18px 110px; flex:1; overflow-y:auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .capture-title{font-family:'Oswald',sans-serif; font-weight:600; font-size:18px; color:#F0EDE4; margin-bottom:2px;}
+  .capture-sub{font-size:12.5px; color:#8d918d; margin-bottom:14px;}
+
+  /* ---------- CAPTURAR ---------- */
+  .capture-frame{
+    aspect-ratio:3/4; background:#1c1e1c; border-radius:16px; border:1.5px dashed #565a56;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; margin-top:8px; cursor:pointer;
+  }
+  .shutter{width:68px; height:68px; border-radius:50%; background:var(--lampara); border:4px solid #F0EDE4; box-shadow:0 6px 20px -6px rgba(232,163,61,0.6);}
+  .shutter-hint{color:#8d918d; font-size:12px; text-align:center; max-width:200px; line-height:1.5;}
+  .recent-label{font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#8d918d; margin:26px 0 10px;}
+  .recent-row{display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.06); align-items:center;}
+  .recent-name{color:#F0EDE4; font-size:13px; font-weight:500;}
+  .recent-status{font-size:10px; font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:0.04em; padding:3px 8px; border-radius:20px;}
+  .status-pend{background:rgba(178,58,46,0.15); color:#D68278;}
+  .status-ok{background:rgba(76,107,79,0.18); color:#9EC2A2;}
+
+  /* ---------- REVISAR (ticket) ---------- */
+  .ticket-wrap{position:relative; padding-top:14px;}
+  .pin{position:absolute; top:0; left:50%; transform:translateX(-50%); width:34px; height:16px; background:#8a8f8a; border-radius:3px; box-shadow:inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.3); z-index:2;}
+  .ticket{background:var(--papel); color:var(--tinta); border-radius:6px; padding:26px 18px 20px; position:relative; box-shadow:0 18px 30px -12px rgba(0,0,0,0.5);}
+  .stamp{position:absolute; top:16px; right:14px; border:2px solid var(--alerta); color:var(--alerta); font-family:'Oswald',sans-serif; font-weight:600; font-size:9.5px; letter-spacing:0.05em; text-transform:uppercase; padding:4px 7px; border-radius:3px; transform:rotate(6deg); opacity:0.85;}
+  .comercio{font-family:'Oswald',sans-serif; font-weight:600; font-size:20px; padding-right:80px; outline:none;}
+  .meta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--tinta-suave); margin-top:4px;}
+  .divider{border:none; border-top:1.5px dashed var(--linea); margin:16px 0;}
+  .item{display:flex; justify-content:space-between; align-items:flex-start; padding:9px 0; gap:10px; border-bottom:1px dotted var(--linea);}
+  .item-left{flex:1; min-width:0;}
+  .item-name{font-size:13.5px; font-weight:500; outline:none;}
+  .item-cat select{
+    margin-top:4px; font-size:9.5px; font-weight:600; padding:2px 7px; border-radius:20px; color:#fff;
+    border:none; -webkit-appearance:none; appearance:none;
+  }
+  .item-qty{font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--tinta-suave); margin-top:2px;}
+  .item-price{font-family:'JetBrains Mono',monospace; font-size:13.5px; font-weight:700; white-space:nowrap; outline:none; min-width:60px; text-align:right;}
+  .total-row{display:flex; justify-content:space-between; align-items:baseline; margin-top:6px; padding-top:14px; border-top:2px solid var(--tinta);}
+  .total-label{font-family:'Oswald',sans-serif; font-weight:600; font-size:13px; text-transform:uppercase;}
+  .total-amount{font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:700;}
+  .actions{display:flex; gap:10px; margin-top:18px;}
+  .btn-editar{flex:1; background:transparent; border:1.5px solid #565a56; color:#D8D5CB; font-weight:600; font-size:13px; padding:13px; border-radius:8px;}
+  .btn-conformar{flex:1.6; background:var(--confirmado); border:1.5px solid var(--confirmado); color:#F0F4EF; font-family:'Oswald',sans-serif; font-weight:600; font-size:14px; text-transform:uppercase; padding:13px; border-radius:8px;}
+  .empty-state{color:#8d918d; font-size:13px; text-align:center; margin-top:60px; line-height:1.6;}
+
+  /* ---------- GASTOS ---------- */
+  .month-title{font-family:'Oswald',sans-serif; font-weight:600; font-size:16px; color:#F0EDE4; text-transform:uppercase; margin:4px 0 14px;}
+  .summary-card{background:var(--papel); border-radius:10px; padding:16px; margin-bottom:18px;}
+  .summary-total-label{font-size:11px; color:var(--tinta-suave); text-transform:uppercase; font-family:'Oswald',sans-serif;}
+  .summary-total-amt{font-family:'JetBrains Mono',monospace; font-size:28px; font-weight:700; color:var(--tinta); margin:4px 0 14px;}
+  .split-row{display:flex; gap:10px; margin-bottom:18px;}
+  .split-box{flex:1; background:rgba(0,0,0,0.03); border-left:3px solid var(--tinta); border-radius:4px; padding:9px 11px;}
+  .split-box.variable{border-left-color:var(--lampara);}
+  .split-label{font-size:10px; text-transform:uppercase; color:var(--tinta-suave); font-family:'Oswald',sans-serif;}
+  .split-amt{font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:700; color:var(--tinta); margin-top:3px;}
+  .bar-row{display:flex; align-items:center; gap:8px; margin-bottom:7px;}
+  .bar-label{font-size:11px; width:82px; flex-shrink:0; color:var(--tinta);}
+  .bar-track{flex:1; height:7px; background:var(--papel-sombra); border-radius:4px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:4px;}
+  .bar-amt{font-family:'JetBrains Mono',monospace; font-size:10.5px; width:52px; text-align:right; color:var(--tinta-suave);}
+  .gasto-row{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);}
+  .gasto-left{display:flex; align-items:center; gap:10px;}
+  .gasto-dot{width:8px; height:8px; border-radius:50%; flex-shrink:0;}
+  .gasto-info .gasto-name{color:#F0EDE4; font-size:13.5px; font-weight:500;}
+  .gasto-info .gasto-date{color:#8d918d; font-size:10.5px; font-family:'JetBrains Mono',monospace; margin-top:2px;}
+  .gasto-amt{font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:#F0EDE4;}
+
+  /* ---------- FIJOS ---------- */
+  .fijo-card{background:var(--papel); border-radius:10px; padding:14px 15px; margin-bottom:10px;}
+  .fijo-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px;}
+  .fijo-name{font-size:14px; font-weight:700; color:var(--tinta);}
+  .fijo-cat{font-size:10.5px; color:var(--tinta-suave); margin-top:2px; display:flex; align-items:center; gap:5px;}
+  .fijo-cat-dot{width:7px; height:7px; border-radius:50%; display:inline-block;}
+  .fijo-amt{font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--tinta); text-align:right; white-space:nowrap;}
+  .fijo-amt .approx{font-size:10px; color:var(--tinta-suave); font-weight:500; display:block;}
+  .fijo-bottom{display:flex; justify-content:space-between; align-items:center; margin-top:11px; padding-top:11px; border-top:1px dashed var(--linea);}
+  .fijo-badge{font-size:10px; font-family:'Oswald',sans-serif; text-transform:uppercase; padding:3px 8px; border-radius:20px; font-weight:600; border:none; cursor:pointer;}
+  .badge-confirmar{background:rgba(178,58,46,0.12); color:var(--alerta);}
+  .badge-proximo{background:rgba(232,163,61,0.18); color:#9C6A1E;}
+  .badge-pagado{background:rgba(76,107,79,0.14); color:var(--confirmado);}
+  .cal-chip{font-size:10.5px; font-weight:600; color:var(--tinta); background:transparent; border:1.3px solid var(--tinta-suave); border-radius:20px; padding:4px 10px;}
+
+  /* ---------- CATEGORIAS ---------- */
+  .cat-row{display:flex; align-items:center; justify-content:space-between; padding:13px 14px; background:var(--papel); border-radius:8px; margin-bottom:8px;}
+  .cat-left{display:flex; align-items:center; gap:10px;}
+  .cat-swatch{width:10px; height:10px; border-radius:3px;}
+  .cat-name{font-size:13.5px; font-weight:600; color:var(--tinta);}
+  .cat-toggle{width:34px; height:19px; border-radius:20px; background:var(--confirmado); position:relative; border:none; cursor:pointer;}
+  .cat-toggle::after{content:''; position:absolute; top:2px; right:2px; width:15px; height:15px; border-radius:50%; background:#fff;}
+  .cat-toggle.off{background:#D8D3C4;}
+  .cat-toggle.off::after{right:auto; left:2px;}
+
+  .add-cat{display:flex; gap:8px; margin-top:16px;}
+  .add-cat input, .add-fijo input, .add-fijo select{
+    flex:1; background:var(--acero); border:1.5px dashed #565a56; border-radius:8px; padding:11px 12px;
+    color:#F0EDE4; font-size:13px; font-family:'Inter',sans-serif;
+  }
+  .add-cat button, .add-fijo button{background:var(--lampara); border:none; border-radius:8px; width:44px; font-size:20px; font-weight:700; color:#2B2E2C;}
+  .add-fijo{display:flex; flex-direction:column; gap:8px; margin-top:18px; background:rgba(255,255,255,0.03); padding:14px; border-radius:10px;}
+  .add-fijo-row{display:flex; gap:8px;}
+  .add-fijo button{width:100%; padding:11px; font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:0.03em;}
+
+  /* ---------- NAV ---------- */
+  .navbar{position:fixed; bottom:0; left:0; right:0; background:var(--acero); border-top:1px solid rgba(255,255,255,0.08); display:flex; padding:10px 6px calc(16px + env(safe-area-inset-bottom)); z-index:10;}
+  .navitem{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 0; cursor:pointer; border:none; background:none;}
+  .navicon{width:20px; height:20px; opacity:0.5;}
+  .navitem.active .navicon{opacity:1;}
+  .navlabel{font-size:9.5px; color:#8d918d; font-weight:600;}
+  .navitem.active .navlabel{color:var(--lampara);}
+
+  .spinner{display:none; text-align:center; color:#8d918d; font-size:12px; margin-top:16px;}
+  .spinner.active{display:block;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-title">Gastos</div>
+    <div class="login-sub">Inicia sesión para continuar</div>
+    <input type="email" id="login-email" placeholder="Email" autocomplete="username">
+    <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password">
+    <button id="login-btn">Entrar</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="clip"></div>
+    <div class="wordmark">Ga<span>stos</span></div>
+    <a href="#" class="logout-link" id="logout-btn">salir</a>
+  </div>
+
+  <div class="screen">
+
+    <!-- CAPTURAR -->
+    <div class="view active" id="view-capturar">
+      <div class="capture-title">Nuevo ticket</div>
+      <div class="capture-sub">Enfoca el ticket o pega una captura de Amazon</div>
+      <div class="capture-frame" id="capture-frame">
+        <div class="shutter"></div>
+        <div class="shutter-hint">Toca para hacer la foto</div>
+      </div>
+      <input type="file" id="file-input" accept="image/*" capture="environment" hidden>
+      <div class="spinner" id="capture-spinner">Leyendo ticket con IA…</div>
+      <div class="recent-label">Últimos tickets</div>
+      <div id="recent-list"></div>
+    </div>
+
+    <!-- REVISAR -->
+    <div class="view" id="view-revisar">
+      <div id="revisar-content"></div>
+    </div>
+
+    <!-- GASTOS -->
+    <div class="view" id="view-gastos">
+      <div id="gastos-content"></div>
+    </div>
+
+    <!-- FIJOS -->
+    <div class="view" id="view-fijos">
+      <div class="capture-title">Gastos fijos</div>
+      <div class="capture-sub">Plantillas recurrentes del mes</div>
+      <div id="fijos-list"></div>
+      <div class="add-fijo">
+        <input type="text" id="fijo-nombre" placeholder="Nombre (ej. Alquiler)">
+        <div class="add-fijo-row">
+          <input type="number" id="fijo-importe" placeholder="Importe €" step="0.01">
+          <input type="number" id="fijo-dia" placeholder="Día del mes" min="1" max="31">
+        </div>
+        <select id="fijo-categoria"></select>
+        <label style="font-size:11px; color:#8d918d; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="fijo-variable" style="width:auto;"> El importe varía cada mes (ej. luz, agua)
+        </label>
+        <button id="add-fijo-btn">Añadir gasto fijo</button>
+      </div>
+    </div>
+
+    <!-- CATEGORIAS -->
+    <div class="view" id="view-categorias">
+      <div class="capture-title">Categorías</div>
+      <div class="capture-sub">Activa, desactiva o añade categorías</div>
+      <div id="cat-list"></div>
+      <div class="add-cat">
+        <input type="text" id="nueva-cat" placeholder="Nueva categoría…">
+        <button id="add-cat-btn">+</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="navbar">
+    <button class="navitem active" data-view="capturar">
+      <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg>
+      <div class="navlabel">Capturar</div>
+    </button>
+    <button class="navitem" data-view="revisar">
+      <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h6M9 15h6"/></svg>
+      <div class="navlabel">Revisar</div>
+    </button>
+    <button class="navitem" data-view="gastos">
+      <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
+      <div class="navlabel">Gastos</div>
+    </button>
+    <button class="navitem" data-view="fijos">
+      <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><path d="M4 4h13l3 3v13H4z"/><path d="M8 4v4h8V4"/></svg>
+      <div class="navlabel">Fijos</div>
+    </button>
+    <button class="navitem" data-view="categorias">
+      <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v4l3 2"/></svg>
+      <div class="navlabel">Categorías</div>
+    </button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./config.js?v=1.0.0"></script>
+<script src="./app.js?v=1.0.0"></script>
+</body>
+</html>
