@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=1.1.0">
+<link rel="manifest" href="./manifest.json?v=1.2.0">
 <meta name="theme-color" content="#2B2E2C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -178,6 +178,29 @@
     color:#F0EDE4; font-size:13px; font-family:'Inter',sans-serif;
   }
   .add-cat button, .add-fijo button{background:var(--lampara); border:none; border-radius:8px; width:44px; font-size:20px; font-weight:700; color:#2B2E2C;}
+
+  .gallery-btn{
+    width:100%; margin-top:10px; background:transparent; border:1.5px solid #565a56;
+    color:#D8D5CB; font-size:12.5px; padding:11px; border-radius:8px; font-family:'Inter',sans-serif;
+  }
+
+  /* ---------- MODAL ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:20px;
+  }
+  .modal-overlay.open{display:flex;}
+  .modal-box{background:var(--papel); border-radius:12px; padding:22px; width:100%; max-width:340px;}
+  .modal-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:17px; color:var(--tinta); margin-bottom:16px;}
+  .modal-box input, .modal-box select{
+    width:100%; padding:11px 12px; border-radius:8px; border:1.5px solid var(--linea);
+    background:#fff; font-size:13px; margin-bottom:10px; font-family:'Inter',sans-serif; color:var(--tinta);
+  }
+  .modal-row{display:flex; gap:8px;}
+  .modal-row input{flex:1;}
+  .modal-check{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--tinta-suave); margin-bottom:16px;}
+  .modal-check input{width:auto; margin:0;}
+  .modal-actions{display:flex; gap:10px;}
   .add-fijo{display:flex; flex-direction:column; gap:8px; margin-top:18px; background:rgba(255,255,255,0.03); padding:14px; border-radius:10px;}
   .add-fijo-row{display:flex; gap:8px;}
   .add-fijo button{width:100%; padding:11px; font-family:'Oswald',sans-serif; text-transform:uppercase; letter-spacing:0.03em;}
@@ -227,15 +250,15 @@
         <div class="shutter"></div>
         <div class="shutter-hint">Toca para hacer la foto</div>
       </div>
+      <button class="gallery-btn" id="gallery-btn">🖼️ Elegir foto guardada</button>
       <input type="file" id="file-input" accept="image/*" capture="environment" hidden>
+      <input type="file" id="file-input-gallery" accept="image/*" hidden>
       <div class="spinner" id="capture-spinner">Leyendo ticket con IA…</div>
+
+      <div id="revisar-content"></div>
+
       <div class="recent-label">Últimos tickets</div>
       <div id="recent-list"></div>
-    </div>
-
-    <!-- REVISAR -->
-    <div class="view" id="view-revisar">
-      <div id="revisar-content"></div>
     </div>
 
     <!-- GASTOS -->
@@ -280,10 +303,6 @@
       <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg>
       <div class="navlabel">Capturar</div>
     </button>
-    <button class="navitem" data-view="revisar">
-      <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h6M9 15h6"/></svg>
-      <div class="navlabel">Revisar</div>
-    </button>
     <button class="navitem" data-view="gastos">
       <svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="#F0EDE4" stroke-width="1.8"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
       <div class="navlabel">Gastos</div>
@@ -299,8 +318,28 @@
   </div>
 </div>
 
+<!-- MODAL: editar gasto fijo -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">Editar gasto fijo</div>
+    <input type="text" id="modal-nombre" placeholder="Nombre">
+    <select id="modal-categoria"></select>
+    <div class="modal-row">
+      <input type="number" id="modal-importe" placeholder="Importe €" step="0.01">
+      <input type="number" id="modal-dia" placeholder="Día" min="1" max="31">
+    </div>
+    <label class="modal-check">
+      <input type="checkbox" id="modal-variable"> El importe varía cada mes (luz, agua...)
+    </label>
+    <div class="modal-actions">
+      <button class="btn-editar" id="modal-cancelar">Cancelar</button>
+      <button class="btn-conformar" id="modal-guardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=1.1.0"></script>
-<script src="./app.js?v=1.1.0"></script>
+<script src="./config.js?v=1.2.0"></script>
+<script src="./app.js?v=1.2.0"></script>
 </body>
 </html>

@@ -128,8 +128,14 @@ function poblarSelectCategoriaFijo() {
 document.getElementById('capture-frame').addEventListener('click', () => {
   document.getElementById('file-input').click();
 });
+document.getElementById('gallery-btn').addEventListener('click', () => {
+  document.getElementById('file-input-gallery').click();
+});
 
-document.getElementById('file-input').addEventListener('change', async (e) => {
+document.getElementById('file-input').addEventListener('change', (e) => procesarFotoTicket(e));
+document.getElementById('file-input-gallery').addEventListener('change', (e) => procesarFotoTicket(e));
+
+async function procesarFotoTicket(e) {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -157,7 +163,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
 
     ticketActual = resultado;
     renderRevisar();
-    irAVista('revisar');
+    document.getElementById('revisar-content').scrollIntoView({ behavior: 'smooth', block: 'start' });
     cargarRecientes();
   } catch (err) {
     alert('No se pudo leer el ticket: ' + err.message);
@@ -165,7 +171,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     spinner.classList.remove('active');
     e.target.value = '';
   }
-});
+}
 
 async function cargarRecientes() {
   const { data } = await sb.from('tickets').select('*').order('creado_en', { ascending: false }).limit(5);
@@ -184,11 +190,11 @@ async function cargarRecientes() {
   `).join('');
 }
 
-// ---------------- REVISAR ----------------
+// ---------------- REVISAR (dentro de la pantalla Capturar) ----------------
 function renderRevisar() {
   const cont = document.getElementById('revisar-content');
   if (!ticketActual) {
-    cont.innerHTML = `<div class="empty-state">No hay ningún ticket pendiente de revisar.<br>Ve a Capturar para escanear uno.</div>`;
+    cont.innerHTML = '';
     return;
   }
 
@@ -312,7 +318,6 @@ async function conformarTicket() {
     ticketActual = null;
     renderRevisar();
     cargarRecientes();
-    irAVista('gastos');
   } catch (err) {
     alert('Error al conformar: ' + err.message);
   }
@@ -594,7 +599,7 @@ async function cargarFijos() {
 
     return `
       <div class="fijo-card">
-        <div class="fijo-top" style="cursor:pointer;" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}">
+        <div class="fijo-top" style="cursor:pointer;" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}" data-variable="${!f.importe_es_fijo}">
           <div>
             <div class="fijo-name">${f.nombre} <span style="font-size:10px; color:var(--tinta-suave);">✎</span></div>
             <div class="fijo-cat"><span class="fijo-cat-dot" style="background:${colorCategoria(f.categorias?.nombre)}"></span>${f.categorias?.nombre || ''} · día ${f.dia_cobro}</div>
@@ -610,7 +615,7 @@ async function cargarFijos() {
   }).join('') || '<div class="empty-state">Todavía no tienes gastos fijos. Añade uno abajo.</div>';
 
   cont.querySelectorAll('.fijo-top').forEach((el) => {
-    el.addEventListener('click', () => editarFijo(el));
+    el.addEventListener('click', () => abrirModalFijo(el));
   });
   cont.querySelectorAll('.fijo-badge:not([disabled])').forEach((btn) => {
     btn.addEventListener('click', () => marcarFijoPagado(btn));
@@ -620,35 +625,53 @@ async function cargarFijos() {
   });
 }
 
-async function editarFijo(el) {
-  const { fijoId, nombre, categoriaId, importe, dia } = el.dataset;
-  const activas = categoriasCache.filter((c) => c.activa);
-  const actual = activas.findIndex((c) => c.id === categoriaId);
+function abrirModalFijo(el) {
+  const { fijoId, nombre, categoriaId, importe, dia, variable } = el.dataset;
 
-  const listado = activas.map((c, i) => `${i + 1}. ${c.nombre}${i === actual ? ' (actual)' : ''}`).join('\n');
-  const eleccion = prompt(`Corregir categoría de "${nombre}":\n\n${listado}\n\nEscribe el número:`, actual >= 0 ? String(actual + 1) : '1');
-  if (eleccion === null) return;
-  const nuevaCategoria = activas[parseInt(eleccion) - 1];
-  if (!nuevaCategoria) { alert('Número no válido'); return; }
+  document.getElementById('modal-nombre').value = nombre;
+  document.getElementById('modal-importe').value = importe;
+  document.getElementById('modal-dia').value = dia;
+  document.getElementById('modal-variable').checked = variable === 'true';
 
-  const nuevoNombre = prompt('Nombre:', nombre);
-  if (nuevoNombre === null) return;
+  const sel = document.getElementById('modal-categoria');
+  sel.innerHTML = categoriasCache.filter((c) => c.activa)
+    .map((c) => `<option value="${c.id}" ${c.id === categoriaId ? 'selected' : ''}>${c.nombre}</option>`).join('');
 
-  const nuevoImporte = prompt('Importe estimado:', importe);
-  if (nuevoImporte === null) return;
+  const overlay = document.getElementById('modal-overlay');
+  overlay.dataset.fijoId = fijoId;
+  overlay.classList.add('open');
+}
 
-  const nuevoDia = prompt('Día del mes:', dia);
-  if (nuevoDia === null) return;
+function cerrarModalFijo() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+document.getElementById('modal-cancelar').addEventListener('click', cerrarModalFijo);
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modal-overlay') cerrarModalFijo();
+});
+
+document.getElementById('modal-guardar').addEventListener('click', async () => {
+  const fijoId = document.getElementById('modal-overlay').dataset.fijoId;
+  const nombre = document.getElementById('modal-nombre').value.trim();
+  const categoriaId = document.getElementById('modal-categoria').value;
+  const importe = parseFloat(document.getElementById('modal-importe').value);
+  const dia = parseInt(document.getElementById('modal-dia').value);
+  const variable = document.getElementById('modal-variable').checked;
+
+  if (!nombre || !importe || !dia || !categoriaId) {
+    alert('Rellena todos los campos.');
+    return;
+  }
 
   await sb.from('gastos_fijos').update({
-    nombre: nuevoNombre.trim() || nombre,
-    categoria_id: nuevaCategoria.id,
-    importe_estimado: parseFloat(nuevoImporte) || parseFloat(importe),
-    dia_cobro: parseInt(nuevoDia) || parseInt(dia),
+    nombre, categoria_id: categoriaId, importe_estimado: importe,
+    dia_cobro: dia, importe_es_fijo: !variable,
   }).eq('id', fijoId);
 
+  cerrarModalFijo();
   cargarFijos();
-}
+});
 
 async function marcarFijoPagado(btn) {
   const importeSugerido = btn.dataset.importe;
