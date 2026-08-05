@@ -669,6 +669,14 @@ document.getElementById('modal-guardar').addEventListener('click', async () => {
     dia_cobro: dia, importe_es_fijo: !variable,
   }).eq('id', fijoId);
 
+  // Si este mes ya se registró el pago de este fijo, corregir también ese gasto
+  const hoy = new Date();
+  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+  await sb.from('gastos')
+    .update({ categoria_id: categoriaId, descripcion: nombre })
+    .eq('gasto_fijo_id', fijoId)
+    .gte('fecha', inicioMes);
+
   cerrarModalFijo();
   cargarFijos();
 });
