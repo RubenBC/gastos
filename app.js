@@ -355,9 +355,12 @@ async function cargarGastos() {
   const ahorro = totalIngresos - total;
 
   const porCategoria = {};
+  const itemsPorCategoria = {};
   data.forEach((g) => {
     const nombre = g.categorias?.nombre || 'Otros';
     porCategoria[nombre] = (porCategoria[nombre] || 0) + Number(g.importe);
+    if (!itemsPorCategoria[nombre]) itemsPorCategoria[nombre] = [];
+    itemsPorCategoria[nombre].push(g);
   });
   const maxCat = Math.max(1, ...Object.values(porCategoria));
 
@@ -426,10 +429,21 @@ async function cargarGastos() {
       </div>
       <div class="chart-wrap"><canvas id="chart-categorias"></canvas></div>
       ${Object.entries(porCategoria).map(([nombre, importe]) => `
-        <div class="bar-row">
-          <div class="bar-label">${nombre}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${(importe / maxCat) * 100}%; background:${colorCategoria(nombre)}"></div></div>
-          <div class="bar-amt">${euros(importe)}</div>
+        <div class="cat-group">
+          <div class="bar-row cat-bar-header">
+            <div class="bar-label">${nombre}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(importe / maxCat) * 100}%; background:${colorCategoria(nombre)}"></div></div>
+            <div class="bar-amt">${euros(importe)}</div>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="cat-group-detail">
+            ${itemsPorCategoria[nombre].map((it) => `
+              <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${it.descripcion}">
+                <span>${it.descripcion}</span>
+                <span>${euros(it.importe)}</span>
+              </div>
+            `).join('')}
+          </div>
         </div>
       `).join('')}
     </div>
@@ -483,7 +497,14 @@ async function cargarGastos() {
     });
   });
 
-  // Editar línea individual dentro de un ticket desplegado
+  // Desplegar/plegar categorías del resumen
+  cont.querySelectorAll('.cat-bar-header').forEach((header) => {
+    header.addEventListener('click', () => {
+      header.closest('.cat-group').classList.toggle('open');
+    });
+  });
+
+  // Editar línea individual dentro de un ticket o categoría desplegada
   cont.querySelectorAll('.ticket-item-row').forEach((row) => {
     row.addEventListener('click', (e) => {
       e.stopPropagation();
