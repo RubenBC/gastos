@@ -5,12 +5,20 @@
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
 const CAT_COLORS = {
-  'alimentación': '#4C6B4F', 'transporte': '#3E5C76', 'ocio': '#C07A2C',
-  'salud': '#A13D3D', 'hogar': '#7A5C3E', 'ropa': '#5C4A66',
-  'suministros': '#2E6E6A', 'otros': '#6B675F',
+  'alimentación': '#FF6B4A', 'transporte': '#3E8EDE', 'ocio': '#A855F7',
+  'salud': '#FF4D6D', 'hogar': '#F5A623', 'ropa': '#EC4899',
+  'suministros': '#14B8A6', 'otros': '#94A3B8',
 };
+const CAT_ICONS = {
+  'alimentación': '🍔', 'transporte': '🚗', 'ocio': '🎬',
+  'salud': '💊', 'hogar': '🏠', 'ropa': '👕',
+  'suministros': '💡', 'otros': '📦',
+};
+function iconoCategoria(nombre) {
+  return CAT_ICONS[(nombre || '').toLowerCase()] || '📦';
+}
 function colorCategoria(nombre) {
-  return CAT_COLORS[(nombre || '').toLowerCase()] || '#6B675F';
+  return CAT_COLORS[(nombre || '').toLowerCase()] || '#94A3B8';
 }
 function euros(n) {
   return (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
@@ -267,7 +275,8 @@ function recalcularTotal() {
 async function descartarTicket() {
   if (!ticketActual) return;
   if (!confirm('¿Descartar este ticket? Se borrará y no se contará como gasto.')) return;
-  await sb.from('tickets').delete().eq('id', ticketActual.ticket.id);
+  const { error } = await sb.from('tickets').delete().eq('id', ticketActual.ticket.id);
+  if (error) { alert('No se pudo descartar: ' + error.message); return; }
   ticketActual = null;
   renderRevisar();
   cargarRecientes();
@@ -291,11 +300,12 @@ async function conformarTicket() {
   try {
     // Actualizar líneas del ticket con lo editado
     for (const item of itemsEditados) {
-      await sb.from('ticket_items').update({
+      const { error: itemError } = await sb.from('ticket_items').update({
         nombre_articulo: item.nombre,
         precio_total: item.precio,
         categoria_id: item.categoriaId,
       }).eq('id', item.id);
+      if (itemError) throw new Error(`Actualizando "${item.nombre}": ${itemError.message}`);
     }
 
     // Crear un gasto por cada línea (para que las estadísticas por categoría sean precisas)
@@ -308,18 +318,20 @@ async function conformarTicket() {
       estado: 'confirmado',
       ticket_id: ticket.id,
     }));
-    await sb.from('gastos').insert(filasGasto);
+    const { error: gastosError } = await sb.from('gastos').insert(filasGasto);
+    if (gastosError) throw new Error(`Creando los gastos: ${gastosError.message}`);
 
     // Marcar el ticket como confirmado
-    await sb.from('tickets').update({
+    const { error: ticketError } = await sb.from('tickets').update({
       comercio, importe_total: totalFinal, estado: 'confirmado',
     }).eq('id', ticket.id);
+    if (ticketError) throw new Error(`Marcando el ticket como confirmado: ${ticketError.message}`);
 
     ticketActual = null;
     renderRevisar();
     cargarRecientes();
   } catch (err) {
-    alert('Error al conformar: ' + err.message);
+    alert('No se pudo conformar el ticket:\n\n' + err.message + '\n\nNo se ha dado por confirmado, sigue en pendiente. Vuelve a intentarlo.');
   }
 }
 
@@ -421,19 +433,28 @@ async function cargarGastos() {
     </div>
 
     <div class="summary-card">
-      <div class="summary-total-label">Total de gastos</div>
-      <div class="summary-total-amt">${euros(total)}</div>
+      <div class="chart-wrap chart-wrap-hero">
+        <canvas id="chart-categorias"></canvas>
+        <div class="chart-center">
+          <div class="chart-center-label">Gastado</div>
+          <div class="chart-center-amt">${euros(total)}</div>
+        </div>
+      </div>
+
       <div class="split-row">
         <div class="split-box"><div class="split-label">📌 Fijo</div><div class="split-amt">${euros(fijo)}</div></div>
         <div class="split-box variable"><div class="split-label">🧾 Variable</div><div class="split-amt">${euros(variable)}</div></div>
       </div>
-      <div class="chart-wrap"><canvas id="chart-categorias"></canvas></div>
+
       ${Object.entries(porCategoria).map(([nombre, importe]) => `
         <div class="cat-group">
-          <div class="bar-row cat-bar-header">
-            <div class="bar-label">${nombre}</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${(importe / maxCat) * 100}%; background:${colorCategoria(nombre)}"></div></div>
-            <div class="bar-amt">${euros(importe)}</div>
+          <div class="cat-circle-row cat-bar-header">
+            <div class="cat-circle" style="background:${colorCategoria(nombre)}">${iconoCategoria(nombre)}</div>
+            <div class="cat-circle-info">
+              <div class="cat-circle-name">${nombre}</div>
+              <div class="cat-circle-pct">${Math.round((importe / total) * 100) || 0}% del total</div>
+            </div>
+            <div class="cat-circle-amt">${euros(importe)}</div>
             <span class="chevron">▾</span>
           </div>
           <div class="cat-group-detail">
@@ -529,13 +550,12 @@ async function cargarGastos() {
           data: Object.values(porCategoria),
           backgroundColor: Object.keys(porCategoria).map(colorCategoria),
           borderColor: '#F5F2E9',
-          borderWidth: 2,
+          borderWidth: 3,
         }],
       },
       options: {
-        plugins: {
-          legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: '#211F1B' } },
-        },
+        cutout: '72%',
+        plugins: { legend: { display: false } },
       },
     });
   }
