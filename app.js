@@ -22,6 +22,9 @@ function fechaLocal(y, m, d) {
   const dd = String(d).padStart(2, '0');
   return `${y}-${mm}-${dd}`;
 }
+function ultimoDiaMes(y, m) {
+  return new Date(y, m + 1, 0).getDate();
+}
 
 let categoriasCache = [];
 let ticketActual = null;
@@ -502,7 +505,7 @@ function editarGasto(row) {
 async function cargarDashboard() {
   const hoy = new Date();
   const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
-  const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+  const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), ultimoDiaMes(hoy.getFullYear(), hoy.getMonth()));
 
   const { data, error } = await sb.from('gastos').select('*')
     .gte('fecha', inicioMes).lte('fecha', finMes).eq('estado', 'confirmado').order('fecha', { ascending: false });
