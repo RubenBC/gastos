@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=2.0.0">
+<link rel="manifest" href="./manifest.json?v=2.1.0">
 <meta name="theme-color" content="#2B2622">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -203,8 +203,12 @@
 
   <div class="actionbar">
     <div class="action-circle action-minus" id="btn-manual">－</div>
-    <div class="action-circle action-camera" id="btn-camara">📷</div>
-    <div class="action-circle action-gallery" id="btn-galeria">🖼️</div>
+    <div class="action-circle action-camera" id="btn-camara">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.6"/></svg>
+    </div>
+    <div class="action-circle action-gallery" id="btn-galeria">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M20.5 15l-5-5-9 9"/></svg>
+    </div>
   </div>
 
   <input type="file" id="file-input" accept="image/*" capture="environment">
@@ -287,7 +291,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=2.0.0"></script>
-<script src="./app.js?v=2.0.0"></script>
+<script src="./config.js?v=2.1.0"></script>
+<script src="./app.js?v=2.1.0"></script>
 </body>
 </html>

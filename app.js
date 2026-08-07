@@ -17,6 +17,11 @@ const PALETTE_ICONS = {
 function colorPadre(nombre) { return PALETTE_COLORS[(nombre || '').toLowerCase()] || '#8a8175'; }
 function iconoPadre(nombre) { return PALETTE_ICONS[(nombre || '').toLowerCase()] || '❓'; }
 function euros(n) { return (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+function fechaLocal(y, m, d) {
+  const mm = String(m + 1).padStart(2, '0');
+  const dd = String(d).padStart(2, '0');
+  return `${y}-${mm}-${dd}`;
+}
 
 let categoriasCache = [];
 let ticketActual = null;
@@ -86,7 +91,7 @@ async function mostrarApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('version-tag').textContent = 'v' + CONFIG.APP_VERSION;
-  document.getElementById('manual-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('manual-fecha').value = (() => { const d = new Date(); return fechaLocal(d.getFullYear(), d.getMonth(), d.getDate()); })();
   await cargarCategorias();
   await cargarDashboard();
 }
@@ -112,8 +117,8 @@ document.getElementById('config-cerrar').addEventListener('click', () => {
 
 async function cargarNominaConfig() {
   const hoy = new Date();
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
-  const inicioMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1).toISOString().split('T')[0];
+  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
+  const inicioMesAnterior = fechaLocal(hoy.getFullYear(), hoy.getMonth() - 1, 1);
 
   const { data: esteMes } = await sb.from('ingresos').select('*').gte('fecha', inicioMes).order('fecha', { ascending: false }).limit(1);
   const { data: mesAnterior } = await sb.from('ingresos').select('*').gte('fecha', inicioMesAnterior).lt('fecha', inicioMes).order('fecha', { ascending: false }).limit(1);
@@ -137,11 +142,12 @@ document.getElementById('nomina-guardar').addEventListener('click', async () => 
     await sb.from('ingresos').update({ importe }).eq('id', nominaEsteMesId);
   } else {
     const { data, error } = await sb.from('ingresos').insert({
-      fecha: new Date().toISOString().split('T')[0], importe, descripcion: 'Nómina',
+      fecha: (() => { const d = new Date(); return fechaLocal(d.getFullYear(), d.getMonth(), d.getDate()); })(), importe, descripcion: 'Nómina',
     }).select().single();
     if (!error) nominaEsteMesId = data.id;
   }
   alert('Nómina guardada.');
+  cargarDashboard();
 });
 
 // ---------------- FIJOS (en Configuración) ----------------
@@ -150,7 +156,7 @@ async function cargarFijosConfig() {
   if (error) { console.error(error); return; }
 
   const hoy = new Date();
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
   const { data: gastosDelMes } = await sb.from('gastos').select('gasto_fijo_id').eq('origen', 'fijo').eq('estado', 'confirmado').gte('fecha', inicioMes);
   const pagadosIds = new Set((gastosDelMes || []).map((g) => g.gasto_fijo_id));
 
@@ -194,7 +200,7 @@ async function marcarFijoPagado(btn) {
   if (importe === null) return;
 
   const { error } = await sb.from('gastos').insert({
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: (() => { const d = new Date(); return fechaLocal(d.getFullYear(), d.getMonth(), d.getDate()); })(),
     importe: parseFloat(importe),
     categoria_id: btn.dataset.categoriaId,
     descripcion: btn.dataset.nombre,
@@ -203,6 +209,7 @@ async function marcarFijoPagado(btn) {
   });
   if (error) { alert('No se pudo registrar: ' + error.message); return; }
   cargarFijosConfig();
+  cargarDashboard();
 }
 
 function abrirCalendario(nombre, dia) {
@@ -261,7 +268,7 @@ document.getElementById('fijo-guardar').addEventListener('click', async () => {
   }).eq('id', fijoId);
 
   const hoy = new Date();
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
+  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
   await sb.from('gastos').update({ categoria_id: categoriaId, descripcion: nombre }).eq('gasto_fijo_id', fijoId).gte('fecha', inicioMes);
 
   document.getElementById('modal-fijo').classList.remove('open');
@@ -462,7 +469,7 @@ function abrirModalManual(existing) {
   modalManualEditId = existing?.id || null;
   document.getElementById('manual-descripcion').value = existing?.descripcion || '';
   document.getElementById('manual-importe').value = existing?.importe || '';
-  document.getElementById('manual-fecha').value = existing?.fecha || new Date().toISOString().split('T')[0];
+  document.getElementById('manual-fecha').value = existing?.fecha || (() => { const d = new Date(); return fechaLocal(d.getFullYear(), d.getMonth(), d.getDate()); })();
   poblarCascada(document.getElementById('manual-categoria'), document.getElementById('manual-subcategoria'), existing?.categoriaId);
   document.getElementById('modal-manual').classList.add('open');
 }
@@ -494,14 +501,15 @@ function editarGasto(row) {
 // ---------------- DASHBOARD ----------------
 async function cargarDashboard() {
   const hoy = new Date();
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0];
-  const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().split('T')[0];
+  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
+  const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth() + 1, 0);
 
   const { data, error } = await sb.from('gastos').select('*')
     .gte('fecha', inicioMes).lte('fecha', finMes).eq('estado', 'confirmado').order('fecha', { ascending: false });
-  if (error) { console.error(error); return; }
+  if (error) { alert('No se pudo cargar el resumen: ' + error.message); return; }
 
-  const { data: ingresos } = await sb.from('ingresos').select('*').gte('fecha', inicioMes).lte('fecha', finMes);
+  const { data: ingresos, error: errorIngresos } = await sb.from('ingresos').select('*').gte('fecha', inicioMes).lte('fecha', finMes);
+  if (errorIngresos) { alert('No se pudieron cargar los ingresos: ' + errorIngresos.message); return; }
   const totalIngresos = (ingresos || []).reduce((a, i) => a + Number(i.importe), 0);
 
   const { data: ticketsMes } = await sb.from('tickets').select('id, comercio, fecha').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
