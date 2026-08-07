@@ -532,26 +532,31 @@ async function cargarDashboard() {
 }
 
 function dibujarDashboard(porPadre, totalGastos, totalIngresos) {
-  const canvas = document.getElementById('chart-categorias');
-  if (chartCategorias) chartCategorias.destroy();
-  const labels = Object.keys(porPadre);
-  const valores = Object.values(porPadre);
-
-  if (labels.length) {
-    chartCategorias = new Chart(canvas, {
-      type: 'doughnut',
-      data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorPadre), borderColor: '#2B2622', borderWidth: 3 }] },
-      options: { cutout: '68%', rotation: -90, plugins: { legend: { display: false } } },
-    });
-  }
-
+  // Los totales se escriben SIEMPRE primero, pase lo que pase con la gráfica
   document.getElementById('center-ingresos').textContent = euros(totalIngresos);
   document.getElementById('center-gastos').textContent = euros(totalGastos);
 
-  requestAnimationFrame(() => posicionarIconos(labels, valores));
+  const labels = Object.keys(porPadre);
+  const valores = Object.values(porPadre);
+
+  try {
+    const canvas = document.getElementById('chart-categorias');
+    if (chartCategorias) { chartCategorias.destroy(); chartCategorias = null; }
+    if (labels.length) {
+      chartCategorias = new Chart(canvas, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorPadre), borderColor: '#2B2622', borderWidth: 3 }] },
+        options: { cutout: '68%', rotation: -90, plugins: { legend: { display: false } } },
+      });
+    }
+    requestAnimationFrame(() => posicionarIconos(labels, valores));
+  } catch (err) {
+    alert('La gráfica falló, pero los totales de arriba son correctos. Detalle técnico: ' + err.message);
+  }
 }
 
 function posicionarIconos(labels, valores) {
+  try {
   const wrap = document.getElementById('chart-wrap-hero');
   wrap.querySelectorAll('.cat-label').forEach((el) => el.remove());
   const svg = document.getElementById('cat-lines');
@@ -589,6 +594,9 @@ function posicionarIconos(labels, valores) {
     label.innerHTML = `<div class="cat-label-icon" style="background:${color}">${iconoPadre(nombre)}</div><div class="cat-label-pct">${Math.round(frac * 100)}%</div>`;
     wrap.appendChild(label);
   });
+  } catch (err) {
+    console.error('Error posicionando iconos:', err);
+  }
 }
 
 function renderMovimientos(data, comercioPorTicket) {
