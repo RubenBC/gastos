@@ -4,23 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=2.1.3">
+<link rel="manifest" href="./manifest.json?v=3.0.0">
 <meta name="theme-color" content="#2B2622">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
   :root{
-    --c1:#d9b34a; --c2:#a75d35; --c3:#c9a769; --c4:#6f4c3e; --c5:#e5c9a9;
-    --c6:#8f7a3d; --c7:#5c3a2e; --c8:#b98b56;
+    --c1:#d9b34a; --c2:#a75d35; --c3:#c9a769; --c4:#6f4c3e; --c5:#e5c9a9; --c6:#8f7a3d; --c7:#5c3a2e; --c8:#b98b56;
     --fondo:#2B2622; --panel:#F5F0E6; --panel-sombra:#E6DDC9;
     --tinta:#231F1A; --tinta-suave:#6E655A; --linea:#DDD2BC;
     --verde:#5C8A5C; --rojo:#B5533E; --ambar:#d9b34a;
+    --texto-app:#EDE6D6; --texto-app-suave:#8a8175;
+  }
+  body.tema-claro{
+    --fondo:#F3EEE3; --panel:#FFFFFF; --panel-sombra:#EDE6D6;
+    --texto-app:#231F1A; --texto-app-suave:#7a7166;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  body{background:var(--fondo); font-family:'Inter',sans-serif; min-height:100vh; display:flex; flex-direction:column;}
+  body{background:var(--fondo); font-family:'Inter',sans-serif; min-height:100vh; display:flex; flex-direction:column; transition:background 0.2s;}
 
-  /* ---------- LOGIN ---------- */
   #login-screen{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;}
   .login-card{background:var(--panel); border-radius:12px; padding:28px 24px; width:100%; max-width:340px; box-shadow:0 18px 30px -12px rgba(0,0,0,0.5);}
   .login-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:24px; color:var(--tinta); margin-bottom:4px;}
@@ -29,30 +32,29 @@
   .login-card button{width:100%; padding:13px; border-radius:8px; border:none; background:var(--verde); color:#fff; font-family:'Oswald',sans-serif; font-weight:600; font-size:14px; text-transform:uppercase; margin-top:6px;}
   #login-error{color:var(--rojo); font-size:12px; margin-top:8px; display:none;}
 
-  /* ---------- APP SHELL ---------- */
   #app{display:none; flex-direction:column; min-height:100vh;}
-  .topbar{padding:16px 18px 12px; display:flex; align-items:center; gap:12px;}
-  .menu-btn{background:none; border:none; color:#EDE6D6; font-size:22px; line-height:1; padding:4px;}
-  .wordmark{font-family:'Oswald',sans-serif; font-weight:600; font-size:16px; letter-spacing:0.05em; color:#EDE6D6; text-transform:uppercase;}
+  .topbar{padding:16px 18px 10px; display:flex; align-items:center; gap:10px;}
+  .wordmark{font-family:'Oswald',sans-serif; font-weight:600; font-size:16px; letter-spacing:0.05em; color:var(--texto-app); text-transform:uppercase;}
   .wordmark span{color:var(--ambar);}
-  .version-tag{font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#8a8175;}
+  .version-tag{font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--texto-app-suave);}
 
-  .screen{padding:0 16px 130px; flex:1; overflow-y:auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .screen{padding:0 16px 8px; flex:1; overflow-y:auto; padding-bottom:186px;}
 
-  /* ---------- DONUT DASHBOARD ---------- */
-  .chart-wrap-hero{position:relative; width:88vw; max-width:400px; height:88vw; max-height:400px; margin:6px auto 26px;}
+  /* ---------- RESUMEN: donut ---------- */
+  .chart-wrap-hero{position:relative; width:88vw; max-width:400px; height:88vw; max-height:400px; margin:6px auto 22px;}
   .chart-canvas-holder{position:absolute; top:19%; left:19%; width:62%; height:62%;}
   .chart-center{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none; width:55%;}
   .chart-center-ingresos{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:19px; color:var(--verde);}
   .chart-center-gastos{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:19px; color:var(--rojo); margin-top:4px;}
-  .cat-label{position:absolute; text-align:center; width:56px; transform:translate(-50%,-50%);}
+  .cat-label{position:absolute; text-align:center; width:56px; transform:translate(-50%,-50%); cursor:pointer;}
   .cat-label-icon{width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; margin:0 auto 3px; box-shadow:0 3px 8px -2px rgba(0,0,0,0.5);}
-  .cat-label-pct{font-size:10.5px; color:#EDE6D6; font-family:'JetBrains Mono',monospace;}
+  .cat-label-pct{font-size:10.5px; color:var(--texto-app); font-family:'JetBrains Mono',monospace;}
   .cat-line-svg{position:absolute; inset:0; width:100%; height:100%; pointer-events:none;}
 
-  .recent-label{font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#8a8175; margin:8px 0 10px;}
+  .recent-label{font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--texto-app-suave); margin:8px 0 10px;}
 
-  /* ---------- movimientos (tickets/gastos) ---------- */
   .ticket-group{background:var(--panel); border-radius:8px; margin-bottom:8px; overflow:hidden;}
   .ticket-group-header{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer;}
   .ticket-group-info{display:flex; align-items:center; gap:10px;}
@@ -72,24 +74,34 @@
   .gasto-name{color:var(--tinta); font-size:13.5px; font-weight:600;}
   .gasto-date{color:var(--tinta-suave); font-size:10.5px; font-family:'JetBrains Mono',monospace; margin-top:1px;}
   .gasto-amt{font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--tinta);}
-  .empty-state{color:#8a8175; font-size:13px; text-align:center; margin-top:20px; line-height:1.6;}
+  .empty-state{color:var(--texto-app-suave); font-size:13px; text-align:center; margin-top:20px; line-height:1.6;}
 
-  /* ---------- BOTTOM ACTION BAR ---------- */
-  .actionbar{position:fixed; bottom:0; left:0; right:0; display:flex; justify-content:center; align-items:center; gap:26px; padding:14px 0 calc(20px + env(safe-area-inset-bottom)); background:linear-gradient(to top, var(--fondo) 60%, transparent);}
+  /* ---------- TICKETS: chips ---------- */
+  .chip-row{display:flex; gap:8px; overflow-x:auto; padding:4px 0 14px; margin:0 -16px; padding-left:16px;}
+  .chip-row::-webkit-scrollbar{display:none;}
+  .filtro-chip{
+    flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 14px; border-radius:20px;
+    border:1.5px solid var(--linea); background:var(--panel); font-size:12.5px; font-weight:600; color:var(--tinta); cursor:pointer;
+  }
+  .filtro-chip.active{border-color:transparent; color:#fff;}
+  .filtro-chip .chip-amt{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; opacity:0.85;}
+
+  /* ---------- ACTION BAR (persistente) ---------- */
+  .actionbar{position:fixed; bottom:64px; left:0; right:0; display:flex; justify-content:center; align-items:center; gap:24px; padding:10px 0; background:linear-gradient(to top, var(--fondo) 55%, transparent); z-index:20;}
   .action-circle{border-radius:50%; display:flex; align-items:center; justify-content:center; border:2.5px solid; cursor:pointer; background:var(--fondo);}
-  .action-minus{width:56px; height:56px; border-color:var(--rojo); color:var(--rojo); font-size:30px;}
-  .action-camera{width:70px; height:70px; border-color:var(--ambar); color:var(--ambar); font-size:28px;}
-  .action-gallery{width:56px; height:56px; border-color:#8a8175; color:#EDE6D6; font-size:22px;}
+  .action-minus{width:50px; height:50px; border-color:var(--rojo); color:var(--rojo); font-size:26px;}
+  .action-camera{width:62px; height:62px; border-color:var(--ambar); color:var(--ambar); font-size:26px;}
+  .action-gallery{width:50px; height:50px; border-color:var(--texto-app-suave); color:var(--texto-app); font-size:20px;}
 
   input[type=file]{display:none;}
-  .spinner{display:none; text-align:center; color:#8a8175; font-size:12px; margin:10px 0;}
+  .spinner{display:none; text-align:center; color:var(--texto-app-suave); font-size:12px; margin:10px 0;}
   .spinner.active{display:block;}
 
   /* ---------- MODAL genérico ---------- */
   .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.65); display:none; align-items:center; justify-content:center; z-index:60; padding:20px; overflow-y:auto;}
   .modal-overlay.open{display:flex;}
   .modal-box{background:var(--panel); border-radius:12px; padding:22px; width:100%; max-width:360px; max-height:88vh; overflow-y:auto;}
-  .modal-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:17px; color:var(--tinta); margin-bottom:16px;}
+  .modal-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:17px; color:var(--tinta); margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;}
   .modal-box input, .modal-box select{width:100%; padding:11px 12px; border-radius:8px; border:1.5px solid var(--linea); background:#fff; font-size:13px; margin-bottom:10px; color:var(--tinta);}
   .modal-row{display:flex; gap:8px;}
   .modal-row input, .modal-row select{flex:1;}
@@ -98,8 +110,8 @@
   .modal-actions{display:flex; gap:10px; margin-top:6px;}
   .btn-secundario{flex:1; background:transparent; border:1.5px solid var(--tinta-suave); color:var(--tinta); font-weight:600; font-size:13px; padding:12px; border-radius:8px;}
   .btn-primario{flex:1.6; background:var(--verde); border:1.5px solid var(--verde); color:#fff; font-family:'Oswald',sans-serif; font-weight:600; font-size:13.5px; text-transform:uppercase; padding:12px; border-radius:8px;}
+  .modal-close-x{background:none; border:none; font-size:20px; color:var(--tinta-suave); line-height:1;}
 
-  /* ---------- TICKET dentro del modal de revisar ---------- */
   .ticket{background:#fff; color:var(--tinta); border-radius:6px; padding:6px 2px 2px; position:relative;}
   .comercio{font-family:'Oswald',sans-serif; font-weight:600; font-size:18px; outline:none;}
   .meta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--tinta-suave); margin-top:4px;}
@@ -113,18 +125,13 @@
   .total-label{font-family:'Oswald',sans-serif; font-weight:600; font-size:13px; text-transform:uppercase;}
   .total-amount{font-family:'JetBrains Mono',monospace; font-size:21px; font-weight:700;}
 
-  /* ---------- CONFIGURACIÓN (overlay de página completa) ---------- */
-  #config-overlay{position:fixed; inset:0; background:var(--fondo); z-index:55; display:none; flex-direction:column;}
-  #config-overlay.open{display:flex;}
-  .config-topbar{padding:16px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid rgba(255,255,255,0.08);}
-  .config-topbar h2{font-family:'Oswald',sans-serif; color:#EDE6D6; font-size:17px; text-transform:uppercase; letter-spacing:0.03em;}
-  .config-screen{padding:18px; flex:1; overflow-y:auto; padding-bottom:60px;}
-  .config-section-title{font-family:'Oswald',sans-serif; font-weight:600; font-size:13px; color:var(--ambar); text-transform:uppercase; letter-spacing:0.05em; margin:22px 0 10px;}
-  .config-section-title:first-child{margin-top:0;}
+  /* ---------- OPCIONES / FIJOS ---------- */
+  .config-section-title{font-family:'Oswald',sans-serif; font-weight:600; font-size:13px; color:var(--ambar); text-transform:uppercase; letter-spacing:0.05em; margin:20px 0 10px;}
+  .config-section-title:first-child{margin-top:6px;}
   .nomina-card{background:var(--panel); border-radius:10px; padding:14px; display:flex; gap:8px; align-items:center;}
   .nomina-card input{flex:1; padding:11px 12px; border-radius:8px; border:1.5px solid var(--linea); font-size:14px;}
   .nomina-card button{background:var(--verde); border:none; border-radius:8px; padding:0 16px; color:#fff; font-family:'Oswald',sans-serif; font-weight:600; font-size:12px; text-transform:uppercase;}
-  .nomina-hint{font-size:10.5px; color:#8a8175; margin-top:6px;}
+  .nomina-hint{font-size:10.5px; color:var(--texto-app-suave); margin-top:6px;}
 
   .fijo-card{background:var(--panel); border-radius:10px; padding:14px 15px; margin-bottom:10px;}
   .fijo-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; cursor:pointer;}
@@ -143,7 +150,7 @@
   .add-fijo{display:flex; flex-direction:column; gap:8px; margin-top:14px; background:rgba(255,255,255,0.04); padding:14px; border-radius:10px;}
   .add-fijo input, .add-fijo select{background:var(--panel); border:1px solid var(--linea); border-radius:8px; padding:10px 11px; font-size:13px;}
   .add-fijo button{background:var(--ambar); border:none; border-radius:8px; padding:11px; font-family:'Oswald',sans-serif; font-weight:600; font-size:12px; text-transform:uppercase; color:#2B2622;}
-  .check-inline{display:flex; align-items:center; gap:6px; font-size:11px; color:#c9c2b4;}
+  .check-inline{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--texto-app-suave);}
   .check-inline input{width:auto;}
 
   .cat-padre-row{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--panel); border-radius:8px; margin-bottom:6px; cursor:pointer;}
@@ -152,19 +159,35 @@
   .cat-padre-name{font-size:13.5px; font-weight:700; color:var(--tinta);}
   .cat-hijas{padding:2px 0 8px 30px; display:none;}
   .cat-padre-row.open + .cat-hijas{display:block;}
-  .cat-hija-row{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; font-size:12px; color:#EDE6D6;}
+  .cat-hija-row{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; font-size:12px; color:var(--texto-app);}
+  .cat-hija-left{display:flex; align-items:center; gap:8px;}
+  .cat-hija-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
   .cat-toggle{width:32px; height:18px; border-radius:20px; background:var(--verde); position:relative; border:none;}
   .cat-toggle::after{content:''; position:absolute; top:2px; right:2px; width:14px; height:14px; border-radius:50%; background:#fff;}
   .cat-toggle.off{background:#5a5348;}
   .cat-toggle.off::after{right:auto; left:2px;}
   .add-subcat{display:flex; gap:6px; padding:8px 10px;}
-  .add-subcat input{flex:1; background:transparent; border:1px dashed #5a5348; border-radius:6px; padding:8px 9px; font-size:12px; color:#EDE6D6;}
+  .add-subcat input{flex:1; background:transparent; border:1px dashed #5a5348; border-radius:6px; padding:8px 9px; font-size:12px; color:var(--texto-app);}
   .add-subcat button{background:var(--ambar); border:none; border-radius:6px; width:34px; color:#2B2622; font-weight:700;}
+
+  .toggle-row{display:flex; justify-content:space-between; align-items:center; background:var(--panel); border-radius:10px; padding:14px; margin-bottom:8px;}
+  .toggle-row-label{font-size:13.5px; font-weight:600; color:var(--tinta);}
+  .toggle-row-sub{font-size:10.5px; color:var(--tinta-suave); margin-top:2px;}
+  .btn-salir{width:100%; margin-top:20px; background:transparent; border:1.5px solid var(--rojo); color:var(--rojo); font-weight:600; font-size:13px; padding:12px; border-radius:8px;}
+
+  /* ---------- NAV INFERIOR ---------- */
+  .navbar{position:fixed; bottom:0; left:0; right:0; background:var(--fondo); border-top:1px solid rgba(128,128,128,0.15); display:flex; padding:8px 6px calc(10px + env(safe-area-inset-bottom)); z-index:21;}
+  .navitem{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 0; cursor:pointer; border:none; background:none;}
+  .navicon{width:20px; height:20px; opacity:0.5; transition:opacity 0.15s;}
+  .navitem.active .navicon{opacity:1;}
+  .navicon-wrap{width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:background 0.15s;}
+  .navitem.active .navicon-wrap{background:rgba(217,179,74,0.18);}
+  .navlabel{font-size:9px; color:var(--texto-app-suave); font-weight:600;}
+  .navitem.active .navlabel{color:var(--ambar);}
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
     <div class="login-title">Gastos</div>
@@ -176,51 +199,118 @@
   </div>
 </div>
 
-<!-- APP -->
 <div id="app">
   <div class="topbar">
-    <button class="menu-btn" id="menu-btn">☰</button>
     <div class="wordmark">Ga<span>stos</span></div>
     <span class="version-tag" id="version-tag"></span>
   </div>
 
-  <div class="screen">
-    <div class="chart-wrap-hero" id="chart-wrap-hero">
-      <svg class="cat-line-svg" id="cat-lines"></svg>
-      <div class="chart-canvas-holder"><canvas id="chart-categorias"></canvas></div>
-      <div class="chart-center">
-        <div class="chart-center-ingresos" id="center-ingresos">0 €</div>
-        <div class="chart-center-gastos" id="center-gastos">0 €</div>
+  <!-- RESUMEN -->
+  <div class="view active" id="view-resumen">
+    <div class="screen">
+      <div class="chart-wrap-hero" id="chart-wrap-hero">
+        <svg class="cat-line-svg" id="cat-lines"></svg>
+        <div class="chart-canvas-holder"><canvas id="chart-categorias"></canvas></div>
+        <div class="chart-center">
+          <div class="chart-center-ingresos" id="center-ingresos">0,00 €</div>
+          <div class="chart-center-gastos" id="center-gastos">0,00 €</div>
+        </div>
       </div>
-      <!-- los iconos de categoría se insertan aquí por JS -->
+      <div class="spinner" id="capture-spinner">Leyendo ticket con IA…</div>
+      <div class="recent-label">Movimientos <span style="font-weight:400; text-transform:none; letter-spacing:0;">(toca uno para corregirlo)</span></div>
+      <div id="movimientos-list"></div>
     </div>
+  </div>
 
-    <div class="spinner" id="capture-spinner">Leyendo ticket con IA…</div>
+  <!-- TICKETS -->
+  <div class="view" id="view-tickets">
+    <div class="screen">
+      <div class="recent-label" style="margin-top:14px;">Compras (súper y online)</div>
+      <div class="chip-row" id="tickets-chips"></div>
+      <div id="tickets-detalle"></div>
+    </div>
+  </div>
 
-    <div class="recent-label">Movimientos <span style="font-weight:400; text-transform:none; letter-spacing:0;">(toca uno para corregirlo)</span></div>
-    <div id="movimientos-list"></div>
+  <!-- FIJOS -->
+  <div class="view" id="view-fijos">
+    <div class="screen">
+      <div class="config-section-title">Nómina de este mes</div>
+      <div class="nomina-card">
+        <input type="number" id="nomina-importe" placeholder="Importe €" step="0.01">
+        <button id="nomina-guardar">Guardar</button>
+      </div>
+      <div class="nomina-hint" id="nomina-hint"></div>
+
+      <div class="config-section-title">Gastos fijos</div>
+      <div id="fijos-list"></div>
+      <div class="add-fijo">
+        <input type="text" id="new-fijo-nombre" placeholder="Nombre (ej. Alquiler)">
+        <select id="new-fijo-categoria"></select>
+        <select id="new-fijo-subcategoria"></select>
+        <div style="display:flex; gap:8px;">
+          <input type="number" id="new-fijo-importe" placeholder="Importe €" step="0.01" style="flex:1;">
+          <input type="number" id="new-fijo-dia" placeholder="Día" min="1" max="31" style="width:80px;">
+        </div>
+        <label class="check-inline"><input type="checkbox" id="new-fijo-variable"> El importe varía cada mes</label>
+        <button id="add-fijo-btn">Añadir gasto fijo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPCIONES -->
+  <div class="view" id="view-opciones">
+    <div class="screen">
+      <div class="config-section-title">Apariencia</div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-row-label">Modo claro</div>
+          <div class="toggle-row-sub">Cambia los colores de la app</div>
+        </div>
+        <button class="cat-toggle off" id="tema-toggle"></button>
+      </div>
+
+      <div class="config-section-title">Categorías</div>
+      <div id="config-cat-list"></div>
+
+      <button class="btn-salir" id="logout-btn">Cerrar sesión</button>
+    </div>
   </div>
 
   <div class="actionbar">
     <div class="action-circle action-minus" id="btn-manual">－</div>
     <div class="action-circle action-camera" id="btn-camara">
-      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.6"/></svg>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.6"/></svg>
     </div>
     <div class="action-circle action-gallery" id="btn-galeria">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M20.5 15l-5-5-9 9"/></svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M20.5 15l-5-5-9 9"/></svg>
     </div>
+  </div>
+
+  <div class="navbar">
+    <button class="navitem active" data-view="resumen">
+      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 8 8h-8z"/></svg></div>
+      <div class="navlabel">Resumen</div>
+    </button>
+    <button class="navitem" data-view="tickets">
+      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h6M9 15h6"/></svg></div>
+      <div class="navlabel">Tickets</div>
+    </button>
+    <button class="navitem" data-view="fijos">
+      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h13l3 3v13H4z"/><path d="M8 4v4h8V4"/></svg></div>
+      <div class="navlabel">Fijos</div>
+    </button>
+    <button class="navitem" data-view="opciones">
+      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+      <div class="navlabel">Opciones</div>
+    </button>
   </div>
 
   <input type="file" id="file-input" accept="image/*" capture="environment">
   <input type="file" id="file-input-gallery" accept="image/*">
 </div>
 
-<!-- MODAL: revisar ticket capturado -->
-<div class="modal-overlay" id="modal-revisar">
-  <div class="modal-box" id="modal-revisar-box"></div>
-</div>
+<div class="modal-overlay" id="modal-revisar"><div class="modal-box" id="modal-revisar-box"></div></div>
 
-<!-- MODAL: añadir gasto manual -->
 <div class="modal-overlay" id="modal-manual">
   <div class="modal-box">
     <div class="modal-title">Gasto imprevisto</div>
@@ -238,7 +328,6 @@
   </div>
 </div>
 
-<!-- MODAL: editar gasto fijo -->
 <div class="modal-overlay" id="modal-fijo">
   <div class="modal-box">
     <div class="modal-title">Gasto fijo</div>
@@ -257,41 +346,16 @@
   </div>
 </div>
 
-<!-- CONFIGURACIÓN -->
-<div id="config-overlay">
-  <div class="config-topbar">
-    <button class="menu-btn" id="config-cerrar">←</button>
-    <h2>Configuración</h2>
-  </div>
-  <div class="config-screen">
-    <div class="config-section-title">Nómina de este mes</div>
-    <div class="nomina-card">
-      <input type="number" id="nomina-importe" placeholder="Importe €" step="0.01">
-      <button id="nomina-guardar">Guardar</button>
-    </div>
-    <div class="nomina-hint" id="nomina-hint"></div>
-
-    <div class="config-section-title">Gastos fijos</div>
-    <div id="fijos-list"></div>
-    <div class="add-fijo">
-      <input type="text" id="new-fijo-nombre" placeholder="Nombre (ej. Alquiler)">
-      <select id="new-fijo-categoria"></select>
-      <select id="new-fijo-subcategoria"></select>
-      <div style="display:flex; gap:8px;">
-        <input type="number" id="new-fijo-importe" placeholder="Importe €" step="0.01" style="flex:1;">
-        <input type="number" id="new-fijo-dia" placeholder="Día" min="1" max="31" style="width:80px;">
-      </div>
-      <label class="check-inline"><input type="checkbox" id="new-fijo-variable"> El importe varía cada mes</label>
-      <button id="add-fijo-btn">Añadir gasto fijo</button>
-    </div>
-
-    <div class="config-section-title">Categorías</div>
-    <div id="config-cat-list"></div>
+<!-- MODAL: detalle de una categoría del círculo -->
+<div class="modal-overlay" id="modal-categoria-detalle">
+  <div class="modal-box">
+    <div class="modal-title"><span id="modal-cat-titulo">Categoría</span><button class="modal-close-x" id="cerrar-modal-cat">✕</button></div>
+    <div id="modal-cat-contenido"></div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=2.1.3"></script>
-<script src="./app.js?v=2.1.3"></script>
+<script src="./config.js?v=3.0.0"></script>
+<script src="./app.js?v=3.0.0"></script>
 </body>
 </html>
