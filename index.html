@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=3.1.0">
+<link rel="manifest" href="./manifest.json?v=3.2.0">
 <meta name="theme-color" content="#2B2622">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -60,7 +60,8 @@
   .ticket-group-info{display:flex; align-items:center; gap:10px;}
   .ticket-group-name{color:var(--tinta); font-weight:600; font-size:13.5px;}
   .ticket-group-date{font-size:10.5px; color:var(--tinta-suave); font-family:'JetBrains Mono',monospace;}
-  .ticket-group-amt{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--tinta);}
+  .ticket-group-amt{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--tinta); margin-left:auto; margin-right:10px;}
+  .ticket-delete-btn{background:none; border:none; font-size:15px; opacity:0.55; padding:4px; flex-shrink:0;}
   .chevron{color:var(--tinta-suave); font-size:11px; transition:transform 0.2s;}
   .ticket-group.open .chevron{transform:rotate(180deg);}
   .ticket-group-detail{display:none; padding:0 14px 12px; border-top:1px dashed var(--linea);}
@@ -355,7 +356,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=3.1.0"></script>
-<script src="./app.js?v=3.1.0"></script>
+<script src="./config.js?v=3.2.0"></script>
+<script src="./app.js?v=3.2.0"></script>
 </body>
 </html>

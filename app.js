@@ -526,6 +526,19 @@ function editarGasto(row) {
   abrirModalManual({ id: gastoId, categoriaId, importe, descripcion, fecha });
 }
 
+async function borrarTicketCompleto(ticketId) {
+  if (!confirm('¿Borrar este ticket entero? Se eliminarán todos sus artículos y no contarán como gasto. No se puede deshacer.')) return;
+
+  const { error: errorGastos } = await sb.from('gastos').delete().eq('ticket_id', ticketId);
+  if (errorGastos) { alert('No se pudo borrar: ' + errorGastos.message); return; }
+
+  const { error: errorTicket } = await sb.from('tickets').delete().eq('id', ticketId);
+  if (errorTicket) { alert('Se borraron los gastos pero no el ticket: ' + errorTicket.message); return; }
+
+  cargarDashboard();
+  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
+}
+
 // ---------------- RESUMEN (dashboard con círculo) ----------------
 async function cargarDashboard() {
   const hoy = new Date();
@@ -721,6 +734,7 @@ function renderMovimientos(data, comercioPorTicket) {
               </div>
             </div>
             <div class="ticket-group-amt">${euros(m.total)}</div>
+            <button class="ticket-delete-btn" data-ticket-id="${m.ticketId}" title="Borrar ticket completo">🗑</button>
           </div>
           <div class="ticket-group-detail">
             ${m.items.map((it) => `
@@ -749,6 +763,7 @@ function renderMovimientos(data, comercioPorTicket) {
   }).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>';
 
   cont.querySelectorAll('.ticket-group-header').forEach((h) => h.addEventListener('click', () => h.closest('.ticket-group').classList.toggle('open')));
+  cont.querySelectorAll('.ticket-delete-btn').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); borrarTicketCompleto(btn.dataset.ticketId); }));
   cont.querySelectorAll('.ticket-item-row').forEach((row) => row.addEventListener('click', (e) => { e.stopPropagation(); editarGasto(row); }));
   cont.querySelectorAll('.gasto-row').forEach((row) => row.addEventListener('click', () => editarGasto(row)));
 }
