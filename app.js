@@ -370,9 +370,12 @@ async function procesarFotoTicket(e) {
 
   try {
     const { data: { session } } = await sb.auth.getSession();
-    const path = `${Date.now()}-${file.name}`;
-    const { error: uploadError } = await sb.storage.from('tickets').upload(path, file);
-    if (uploadError) throw uploadError;
+    const nombreOriginal = file.name || `imagen.${(file.type || 'image/jpeg').split('/')[1] || 'jpg'}`;
+    const nombreSeguro = nombreOriginal.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${Date.now()}-${nombreSeguro}`;
+
+    const { error: uploadError } = await sb.storage.from('tickets').upload(path, file, { contentType: file.type || 'image/jpeg' });
+    if (uploadError) throw new Error(`Subiendo la imagen: ${uploadError.message}`);
 
     const res = await fetch(`${CONFIG.FUNCTIONS_URL}/leer-ticket`, {
       method: 'POST',
@@ -464,6 +467,11 @@ async function conformarTicket() {
   }));
   const comercio = document.getElementById('edit-comercio').textContent.trim();
   const totalFinal = itemsEditados.reduce((a, i) => a + i.precio, 0);
+
+  if (itemsEditados.length === 0) {
+    alert('Este ticket no tiene artículos que confirmar. Descártalo y vuelve a escanearlo.');
+    return;
+  }
 
   try {
     for (const item of itemsEditados) {
@@ -678,63 +686,68 @@ document.getElementById('modal-categoria-detalle').addEventListener('click', (e)
 
 // ---------------- MOVIMIENTOS (lista bajo el círculo) ----------------
 function renderMovimientos(data, comercioPorTicket) {
-  const movimientos = [];
+  const tickets = [];
+  const otros = [];
   const gruposTicket = {};
   data.forEach((g) => {
     if (g.origen === 'ticket' && g.ticket_id) {
       if (!gruposTicket[g.ticket_id]) {
-        gruposTicket[g.ticket_id] = { tipo: 'ticket', ticketId: g.ticket_id, fecha: g.fecha, comercio: comercioPorTicket[g.ticket_id] || 'Ticket', total: 0, items: [] };
-        movimientos.push(gruposTicket[g.ticket_id]);
+        gruposTicket[g.ticket_id] = { ticketId: g.ticket_id, fecha: g.fecha, comercio: comercioPorTicket[g.ticket_id] || 'Ticket', total: 0, items: [] };
+        tickets.push(gruposTicket[g.ticket_id]);
       }
       gruposTicket[g.ticket_id].total += Number(g.importe);
       gruposTicket[g.ticket_id].items.push(g);
     } else {
-      movimientos.push({ tipo: 'simple', gasto: g });
+      otros.push(g);
     }
   });
-  movimientos.sort((a, b) => (a.tipo === 'ticket' ? a.fecha : a.gasto.fecha) < (b.tipo === 'ticket' ? b.fecha : b.gasto.fecha) ? 1 : -1);
+  tickets.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  otros.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+
+  const htmlTickets = tickets.map((m) => `
+    <div class="ticket-group" data-ticket-id="${m.ticketId}">
+      <div class="ticket-group-header">
+        <div class="ticket-group-info">
+          <span class="chevron">▾</span>
+          <div>
+            <div class="ticket-group-name">${m.comercio}</div>
+            <div class="ticket-group-date">${new Date(m.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+          </div>
+        </div>
+        <div class="ticket-group-amt">${euros(m.total)}</div>
+        <button class="ticket-delete-btn" data-ticket-id="${m.ticketId}" title="Borrar ticket completo">🗑</button>
+      </div>
+      <div class="ticket-group-detail">
+        ${m.items.map((it) => `
+          <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${it.descripcion}" data-fecha="${it.fecha}">
+            <span><span class="cat-dot-inline" style="background:${colorDeCategoria(it.categoria_id)}"></span>${it.descripcion.split(' — ').slice(1).join(' — ') || it.descripcion}</span>
+            <span>${euros(it.importe)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('') || '<div class="empty-state">Sin tickets este mes todavía.</div>';
+
+  const htmlOtros = otros.map((g) => `
+    <div class="gasto-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
+      <div class="gasto-left">
+        <div class="gasto-dot" style="background:${colorDeCategoria(g.categoria_id)}"></div>
+        <div>
+          <div class="gasto-name">${g.descripcion}</div>
+          <div class="gasto-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+        </div>
+      </div>
+      <div class="gasto-amt">${euros(g.importe)}</div>
+    </div>
+  `).join('') || '<div class="empty-state">Sin gastos fijos registrados este mes.</div>';
 
   const cont = document.getElementById('movimientos-list');
-  cont.innerHTML = movimientos.map((m) => {
-    if (m.tipo === 'ticket') {
-      return `
-        <div class="ticket-group" data-ticket-id="${m.ticketId}">
-          <div class="ticket-group-header">
-            <div class="ticket-group-info">
-              <span class="chevron">▾</span>
-              <div>
-                <div class="ticket-group-name">${m.comercio}</div>
-                <div class="ticket-group-date">${new Date(m.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
-              </div>
-            </div>
-            <div class="ticket-group-amt">${euros(m.total)}</div>
-            <button class="ticket-delete-btn" data-ticket-id="${m.ticketId}" title="Borrar ticket completo">🗑</button>
-          </div>
-          <div class="ticket-group-detail">
-            ${m.items.map((it) => `
-              <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${it.descripcion}" data-fecha="${it.fecha}">
-                <span><span class="cat-dot-inline" style="background:${colorDeCategoria(it.categoria_id)}"></span>${it.descripcion.split(' — ').slice(1).join(' — ') || it.descripcion}</span>
-                <span>${euros(it.importe)}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-    const g = m.gasto;
-    return `
-      <div class="gasto-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-        <div class="gasto-left">
-          <div class="gasto-dot" style="background:${colorDeCategoria(g.categoria_id)}"></div>
-          <div>
-            <div class="gasto-name">${g.descripcion}</div>
-            <div class="gasto-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
-          </div>
-        </div>
-        <div class="gasto-amt">${euros(g.importe)}</div>
-      </div>
-    `;
-  }).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>';
+  cont.innerHTML = `
+    <div class="recent-label" style="margin-top:0;">Tickets</div>
+    ${htmlTickets}
+    <div class="recent-label">Gastos fijos</div>
+    ${htmlOtros}
+  `;
 
   cont.querySelectorAll('.ticket-group-header').forEach((h) => h.addEventListener('click', () => h.closest('.ticket-group').classList.toggle('open')));
   cont.querySelectorAll('.ticket-delete-btn').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); borrarTicketCompleto(btn.dataset.ticketId); }));
