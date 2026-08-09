@@ -557,46 +557,32 @@ async function cargarDashboard() {
   (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
 
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
-
-  // Por subcategoría (id real), para que el donut tenga un tono por cada una
-  const porSubcategoria = {};
-  data.forEach((g) => { porSubcategoria[g.categoria_id] = (porSubcategoria[g.categoria_id] || 0) + Number(g.importe); });
-
-  // Ordenar: agrupadas por categoría padre (mismo orden que en Opciones), y dentro por orden de subcategoría
-  const ordenPadres = padres().map((p) => p.id);
-  const entradas = Object.entries(porSubcategoria).sort((a, b) => {
-    const catA = categoriasCache.find((c) => c.id === a[0]);
-    const catB = categoriasCache.find((c) => c.id === b[0]);
-    const padreA = catA?.padre_id || catA?.id;
-    const padreB = catB?.padre_id || catB?.id;
-    const diff = ordenPadres.indexOf(padreA) - ordenPadres.indexOf(padreB);
-    if (diff !== 0) return diff;
-    return (catA?.orden || 0) - (catB?.orden || 0);
+  const porPadre = {};
+  data.forEach((g) => {
+    const nombre = padreDeCategoria(g.categoria_id);
+    porPadre[nombre] = (porPadre[nombre] || 0) + Number(g.importe);
   });
 
-  const sliceIds = entradas.map((e) => e[0]);
-  const sliceValores = entradas.map((e) => e[1]);
-
   window._gastosDelMes = data; // para el popup de categoría
-  dibujarDashboard(sliceIds, sliceValores, total, totalIngresos);
+  dibujarDashboard(porPadre, total, totalIngresos);
   renderMovimientos(data, comercioPorTicket);
 }
 
-function dibujarDashboard(sliceIds, sliceValores, totalGastos, totalIngresos) {
+function dibujarDashboard(porPadre, totalGastos, totalIngresos) {
   document.getElementById('center-ingresos').textContent = euros(totalIngresos);
   document.getElementById('center-gastos').textContent = euros(totalGastos);
+
+  const labels = Object.keys(porPadre);
+  const valores = Object.values(porPadre);
 
   try {
     const canvas = document.getElementById('chart-categorias');
     if (chartCategorias) { chartCategorias.destroy(); chartCategorias = null; }
     const bordeChart = document.body.classList.contains('tema-claro') ? '#F3EEE3' : '#2B2622';
-    if (sliceIds.length) {
+    if (labels.length) {
       chartCategorias = new Chart(canvas, {
         type: 'doughnut',
-        data: {
-          labels: sliceIds.map((id) => nombreCompleto(id)),
-          datasets: [{ data: sliceValores, backgroundColor: sliceIds.map((id) => colorDeCategoria(id)), borderColor: bordeChart, borderWidth: 2 }],
-        },
+        data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorPadre), borderColor: bordeChart, borderWidth: 3 }] },
         options: {
           cutout: '68%', rotation: -90,
           plugins: {
@@ -606,13 +592,13 @@ function dibujarDashboard(sliceIds, sliceValores, totalGastos, totalIngresos) {
         },
       });
     }
-    requestAnimationFrame(() => posicionarIconos(sliceIds, sliceValores));
+    requestAnimationFrame(() => posicionarIconos(labels, valores));
   } catch (err) {
     alert('La gráfica falló, pero los totales de arriba son correctos. Detalle técnico: ' + err.message);
   }
 }
 
-function posicionarIconos(sliceIds, sliceValores) {
+function posicionarIconos(labels, valores) {
   try {
     const wrap = document.getElementById('chart-wrap-hero');
     wrap.querySelectorAll('.cat-label').forEach((el) => el.remove());
@@ -620,32 +606,20 @@ function posicionarIconos(sliceIds, sliceValores) {
     svg.innerHTML = '';
 
     const size = wrap.clientWidth;
-    if (!size || !sliceIds.length) return;
+    if (!size || !labels.length) return;
     svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
     const cx = size / 2, cy = size / 2;
     const donutR = size * 0.31, lineR = size * 0.44, iconR = size * 0.47;
-    const total = sliceValores.reduce((a, b) => a + b, 0) || 1;
+    const total = valores.reduce((a, b) => a + b, 0) || 1;
+    let acumulado = 0;
 
-    // Agrupar las porciones contiguas que pertenecen a la misma categoría padre,
-    // para poner UN solo icono por padre (aunque tenga varias subcategorías)
-    const grupos = [];
-    let acumulado = 0, i = 0;
-    while (i < sliceIds.length) {
-      const nombrePadre = padreDeCategoria(sliceIds[i]);
-      const inicio = acumulado;
-      let suma = 0;
-      while (i < sliceIds.length && padreDeCategoria(sliceIds[i]) === nombrePadre) {
-        suma += sliceValores[i];
-        acumulado += sliceValores[i] / total;
-        i++;
-      }
-      grupos.push({ nombre: nombrePadre, valor: suma, mid: (inicio + acumulado) / 2 });
-    }
-
-    grupos.forEach((grupo) => {
-      const angleRad = (-90 + grupo.mid * 360) * Math.PI / 180;
-      const color = colorPadre(grupo.nombre);
+    labels.forEach((nombre, i) => {
+      const frac = valores[i] / total;
+      const midFrac = acumulado + frac / 2;
+      acumulado += frac;
+      const angleRad = (-90 + midFrac * 360) * Math.PI / 180;
+      const color = colorPadre(nombre);
 
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', cx + donutR * Math.cos(angleRad));
@@ -660,8 +634,8 @@ function posicionarIconos(sliceIds, sliceValores) {
       label.className = 'cat-label';
       label.style.left = (cx + iconR * Math.cos(angleRad)) + 'px';
       label.style.top = (cy + iconR * Math.sin(angleRad)) + 'px';
-      label.innerHTML = `<div class="cat-label-icon" style="background:${color}">${iconoPadre(grupo.nombre)}</div><div class="cat-label-pct">${Math.round((grupo.valor / total) * 100)}%</div>`;
-      label.addEventListener('click', () => abrirDetalleCategoria(grupo.nombre));
+      label.innerHTML = `<div class="cat-label-icon" style="background:${color}">${iconoPadre(nombre)}</div><div class="cat-label-pct">${Math.round(frac * 100)}%</div>`;
+      label.addEventListener('click', () => abrirDetalleCategoria(nombre));
       wrap.appendChild(label);
     });
   } catch (err) {
@@ -769,7 +743,8 @@ function renderMovimientos(data, comercioPorTicket) {
 }
 
 // ---------------- TICKETS (compras: súper + online) ----------------
-const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Otros'];
+const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Compras online', 'Otros'];
+const PALABRAS_ONLINE = /amazon|aliexpress|ebay|shein|zalando|el corte inglés online|pccomponentes/i;
 
 async function cargarTickets() {
   const hoy = new Date();
@@ -779,13 +754,19 @@ async function cargarTickets() {
   const { data, error } = await sb.from('gastos').select('*').eq('origen', 'ticket').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
   if (error) { alert('No se pudieron cargar los tickets: ' + error.message); return; }
 
-  window._gastosTicketsMes = data;
+  const { data: ticketsMes, error: errorTickets } = await sb.from('tickets').select('id, comercio, fecha, importe_total').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
+  if (errorTickets) { alert('No se pudieron cargar los tickets: ' + errorTickets.message); return; }
+
+  const ticketPorId = {};
+  (ticketsMes || []).forEach((t) => { ticketPorId[t.id] = t; });
 
   function etiquetaDe(g) {
     const nombreSub = nombreCompleto(g.categoria_id).split(' · ')[1] || '';
     if (nombreSub === 'Alimentos') return 'Alimentación';
     if (nombreSub === 'Higiene personal') return 'Higiene personal';
     if (nombreSub === 'Limpieza') return 'Limpieza';
+    const comercio = ticketPorId[g.ticket_id]?.comercio || '';
+    if (PALABRAS_ONLINE.test(comercio)) return 'Compras online';
     return 'Otros';
   }
 
@@ -796,41 +777,63 @@ async function cargarTickets() {
     porEtiqueta[e].items.push(g);
     porEtiqueta[e].total += Number(g.importe);
   });
-  window._porEtiquetaTickets = porEtiqueta;
 
+  // Chips: solo informativos, tocarlos abre el desglose en popup
   const chips = document.getElementById('tickets-chips');
   chips.innerHTML = ETIQUETAS_TICKETS.map((e) => `
-    <div class="filtro-chip ${filtroTicketsActivo === e ? 'active' : ''}" style="${filtroTicketsActivo === e ? `background:${colorPadre(e === 'Otros' ? 'otros' : 'hogar')}` : ''}" data-etiqueta="${e}">
-      ${e} <span class="chip-amt">${euros(porEtiqueta[e].total)}</span>
-    </div>
+    <div class="filtro-chip" data-etiqueta="${e}">${e} <span class="chip-amt">${euros(porEtiqueta[e].total)}</span></div>
   `).join('');
-
   chips.querySelectorAll('.filtro-chip').forEach((chip) => {
-    chip.addEventListener('click', () => { filtroTicketsActivo = chip.dataset.etiqueta; cargarTickets(); });
+    chip.addEventListener('click', () => abrirDetalleEtiquetaTickets(chip.dataset.etiqueta, porEtiqueta[chip.dataset.etiqueta]));
   });
 
+  // Lista de TODOS los tickets del mes, desplegables
   const detalle = document.getElementById('tickets-detalle');
-  if (!filtroTicketsActivo) {
-    detalle.innerHTML = '<div class="empty-state">Elige una etiqueta arriba para ver los productos de este mes.</div>';
-    return;
-  }
-  const grupo = porEtiqueta[filtroTicketsActivo];
-  detalle.innerHTML = `
-    <div class="recent-label" style="margin-top:16px;">${filtroTicketsActivo} · ${euros(grupo.total)}</div>
-    ${grupo.items.map((g) => `
-      <div class="gasto-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-        <div class="gasto-left">
-          <div class="gasto-dot" style="background:${colorDeCategoria(g.categoria_id)}"></div>
-          <div>
-            <div class="gasto-name">${g.descripcion}</div>
-            <div class="gasto-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+  detalle.innerHTML = `<div class="recent-label" style="margin-top:16px;">Todos los tickets de este mes</div>` + ((ticketsMes || []).map((t) => {
+    const items = data.filter((g) => g.ticket_id === t.id);
+    return `
+      <div class="ticket-group" data-ticket-id="${t.id}">
+        <div class="ticket-group-header">
+          <div class="ticket-group-info">
+            <span class="chevron">▾</span>
+            <div>
+              <div class="ticket-group-name">${t.comercio}</div>
+              <div class="ticket-group-date">${new Date(t.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+            </div>
           </div>
+          <div class="ticket-group-amt">${euros(t.importe_total)}</div>
+          <button class="ticket-delete-btn" data-ticket-id="${t.id}" title="Borrar ticket completo">🗑</button>
         </div>
-        <div class="gasto-amt">${euros(g.importe)}</div>
+        <div class="ticket-group-detail">
+          ${items.map((g) => `
+            <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
+              <span><span class="cat-dot-inline" style="background:${colorDeCategoria(g.categoria_id)}"></span>${g.descripcion.split(' — ').slice(1).join(' — ') || g.descripcion}</span>
+              <span>${euros(g.importe)}</span>
+            </div>
+          `).join('')}
+        </div>
       </div>
-    `).join('') || '<div class="empty-state">Nada en esta etiqueta todavía.</div>'}
-  `;
-  detalle.querySelectorAll('.gasto-row').forEach((row) => row.addEventListener('click', () => editarGasto(row)));
+    `;
+  }).join('') || '<div class="empty-state">Todavía no has escaneado ningún ticket este mes.</div>');
+
+  detalle.querySelectorAll('.ticket-group-header').forEach((h) => h.addEventListener('click', () => h.closest('.ticket-group').classList.toggle('open')));
+  detalle.querySelectorAll('.ticket-delete-btn').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); borrarTicketCompleto(btn.dataset.ticketId); }));
+  detalle.querySelectorAll('.ticket-item-row').forEach((row) => row.addEventListener('click', (e) => { e.stopPropagation(); editarGasto(row); }));
+}
+
+function abrirDetalleEtiquetaTickets(nombreEtiqueta, grupo) {
+  document.getElementById('modal-cat-titulo').textContent = `${nombreEtiqueta} — ${euros(grupo.total)}`;
+  document.getElementById('modal-cat-contenido').innerHTML = grupo.items.map((g) => `
+    <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
+      <span>${g.descripcion}</span>
+      <span>${euros(g.importe)}</span>
+    </div>
+  `).join('') || '<div class="empty-state">Nada en esta etiqueta todavía.</div>';
+
+  document.getElementById('modal-cat-contenido').querySelectorAll('.ticket-item-row').forEach((row) => {
+    row.addEventListener('click', () => { document.getElementById('modal-categoria-detalle').classList.remove('open'); editarGasto(row); });
+  });
+  document.getElementById('modal-categoria-detalle').classList.add('open');
 }
 
 // ---------------- ARRANQUE ----------------
