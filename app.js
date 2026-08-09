@@ -544,42 +544,62 @@ async function cargarDashboard() {
   (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
 
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
-  const porPadre = {};
-  data.forEach((g) => {
-    const nombre = padreDeCategoria(g.categoria_id);
-    porPadre[nombre] = (porPadre[nombre] || 0) + Number(g.importe);
+
+  // Por subcategoría (id real), para que el donut tenga un tono por cada una
+  const porSubcategoria = {};
+  data.forEach((g) => { porSubcategoria[g.categoria_id] = (porSubcategoria[g.categoria_id] || 0) + Number(g.importe); });
+
+  // Ordenar: agrupadas por categoría padre (mismo orden que en Opciones), y dentro por orden de subcategoría
+  const ordenPadres = padres().map((p) => p.id);
+  const entradas = Object.entries(porSubcategoria).sort((a, b) => {
+    const catA = categoriasCache.find((c) => c.id === a[0]);
+    const catB = categoriasCache.find((c) => c.id === b[0]);
+    const padreA = catA?.padre_id || catA?.id;
+    const padreB = catB?.padre_id || catB?.id;
+    const diff = ordenPadres.indexOf(padreA) - ordenPadres.indexOf(padreB);
+    if (diff !== 0) return diff;
+    return (catA?.orden || 0) - (catB?.orden || 0);
   });
 
+  const sliceIds = entradas.map((e) => e[0]);
+  const sliceValores = entradas.map((e) => e[1]);
+
   window._gastosDelMes = data; // para el popup de categoría
-  dibujarDashboard(porPadre, total, totalIngresos);
+  dibujarDashboard(sliceIds, sliceValores, total, totalIngresos);
   renderMovimientos(data, comercioPorTicket);
 }
 
-function dibujarDashboard(porPadre, totalGastos, totalIngresos) {
+function dibujarDashboard(sliceIds, sliceValores, totalGastos, totalIngresos) {
   document.getElementById('center-ingresos').textContent = euros(totalIngresos);
   document.getElementById('center-gastos').textContent = euros(totalGastos);
-
-  const labels = Object.keys(porPadre);
-  const valores = Object.values(porPadre);
 
   try {
     const canvas = document.getElementById('chart-categorias');
     if (chartCategorias) { chartCategorias.destroy(); chartCategorias = null; }
     const bordeChart = document.body.classList.contains('tema-claro') ? '#F3EEE3' : '#2B2622';
-    if (labels.length) {
+    if (sliceIds.length) {
       chartCategorias = new Chart(canvas, {
         type: 'doughnut',
-        data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorPadre), borderColor: bordeChart, borderWidth: 3 }] },
-        options: { cutout: '68%', rotation: -90, plugins: { legend: { display: false } } },
+        data: {
+          labels: sliceIds.map((id) => nombreCompleto(id)),
+          datasets: [{ data: sliceValores, backgroundColor: sliceIds.map((id) => colorDeCategoria(id)), borderColor: bordeChart, borderWidth: 2 }],
+        },
+        options: {
+          cutout: '68%', rotation: -90,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } },
+          },
+        },
       });
     }
-    requestAnimationFrame(() => posicionarIconos(labels, valores));
+    requestAnimationFrame(() => posicionarIconos(sliceIds, sliceValores));
   } catch (err) {
     alert('La gráfica falló, pero los totales de arriba son correctos. Detalle técnico: ' + err.message);
   }
 }
 
-function posicionarIconos(labels, valores) {
+function posicionarIconos(sliceIds, sliceValores) {
   try {
     const wrap = document.getElementById('chart-wrap-hero');
     wrap.querySelectorAll('.cat-label').forEach((el) => el.remove());
@@ -587,20 +607,32 @@ function posicionarIconos(labels, valores) {
     svg.innerHTML = '';
 
     const size = wrap.clientWidth;
-    if (!size || !labels.length) return;
+    if (!size || !sliceIds.length) return;
     svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
     const cx = size / 2, cy = size / 2;
     const donutR = size * 0.31, lineR = size * 0.44, iconR = size * 0.47;
-    const total = valores.reduce((a, b) => a + b, 0) || 1;
-    let acumulado = 0;
+    const total = sliceValores.reduce((a, b) => a + b, 0) || 1;
 
-    labels.forEach((nombre, i) => {
-      const frac = valores[i] / total;
-      const midFrac = acumulado + frac / 2;
-      acumulado += frac;
-      const angleRad = (-90 + midFrac * 360) * Math.PI / 180;
-      const color = colorPadre(nombre);
+    // Agrupar las porciones contiguas que pertenecen a la misma categoría padre,
+    // para poner UN solo icono por padre (aunque tenga varias subcategorías)
+    const grupos = [];
+    let acumulado = 0, i = 0;
+    while (i < sliceIds.length) {
+      const nombrePadre = padreDeCategoria(sliceIds[i]);
+      const inicio = acumulado;
+      let suma = 0;
+      while (i < sliceIds.length && padreDeCategoria(sliceIds[i]) === nombrePadre) {
+        suma += sliceValores[i];
+        acumulado += sliceValores[i] / total;
+        i++;
+      }
+      grupos.push({ nombre: nombrePadre, valor: suma, mid: (inicio + acumulado) / 2 });
+    }
+
+    grupos.forEach((grupo) => {
+      const angleRad = (-90 + grupo.mid * 360) * Math.PI / 180;
+      const color = colorPadre(grupo.nombre);
 
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', cx + donutR * Math.cos(angleRad));
@@ -615,8 +647,8 @@ function posicionarIconos(labels, valores) {
       label.className = 'cat-label';
       label.style.left = (cx + iconR * Math.cos(angleRad)) + 'px';
       label.style.top = (cy + iconR * Math.sin(angleRad)) + 'px';
-      label.innerHTML = `<div class="cat-label-icon" style="background:${color}">${iconoPadre(nombre)}</div><div class="cat-label-pct">${Math.round(frac * 100)}%</div>`;
-      label.addEventListener('click', () => abrirDetalleCategoria(nombre));
+      label.innerHTML = `<div class="cat-label-icon" style="background:${color}">${iconoPadre(grupo.nombre)}</div><div class="cat-label-pct">${Math.round((grupo.valor / total) * 100)}%</div>`;
+      label.addEventListener('click', () => abrirDetalleCategoria(grupo.nombre));
       wrap.appendChild(label);
     });
   } catch (err) {
@@ -722,7 +754,7 @@ function renderMovimientos(data, comercioPorTicket) {
 }
 
 // ---------------- TICKETS (compras: súper + online) ----------------
-const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Hogar', 'Otros'];
+const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Otros'];
 
 async function cargarTickets() {
   const hoy = new Date();
@@ -736,11 +768,9 @@ async function cargarTickets() {
 
   function etiquetaDe(g) {
     const nombreSub = nombreCompleto(g.categoria_id).split(' · ')[1] || '';
-    const nombrePadre = padreDeCategoria(g.categoria_id);
     if (nombreSub === 'Alimentos') return 'Alimentación';
     if (nombreSub === 'Higiene personal') return 'Higiene personal';
     if (nombreSub === 'Limpieza') return 'Limpieza';
-    if (nombrePadre === 'Hogar') return 'Hogar';
     return 'Otros';
   }
 
