@@ -4,31 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.0.0">
-<meta name="theme-color" content="#14120E">
+<link rel="manifest" href="./manifest.json?v=4.1.0">
+<meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
   :root{
-    --md-primary:#E8C077; --md-on-primary:#3F2E00; --md-primary-container:#5C4400; --md-on-primary-container:#FFDEA0;
-    --md-secondary:#D3C0A3; --md-on-secondary:#382F1B; --md-secondary-container:#4F452C; --md-on-secondary-container:#F0DEBC;
+    --md-primary:#8FCB86; --md-on-primary:#0B2607; --md-primary-container:#274A21; --md-on-primary-container:#B6E8AC;
+    --md-secondary:#A9C9A0; --md-on-secondary:#1A2E16; --md-secondary-container:#324A2C; --md-on-secondary-container:#C5E4BC;
     --md-error:#FFB4AB; --md-on-error:#690005; --md-error-container:#93000A; --md-on-error-container:#FFDAD6;
-    --md-success:#A8D2A0; --md-on-success-container:#0C2007;
-    --md-background:#14120E; --md-surface:#14120E; --md-on-surface:#E8E1D4; --md-on-surface-variant:#CBC3B3;
-    --md-surface-container-low:#1C1A15; --md-surface-container:#201E18; --md-surface-container-high:#2B2820; --md-surface-container-highest:#363228;
-    --md-outline:#948E7F; --md-outline-variant:#4B4639;
+    --md-success:#8FCB86; --md-on-success-container:#0C2007;
+    --md-background:#101A13; --md-surface:#101A13; --md-on-surface:#E2ECDF; --md-on-surface-variant:#BFCBB9;
+    --md-surface-container-low:#16221B; --md-surface-container:#1B2820; --md-surface-container-high:#233128; --md-surface-container-highest:#2C3B31;
+    --md-outline:#8A9683; --md-outline-variant:#3D4A3F;
   }
   body.tema-claro{
-    --md-primary:#7A5900; --md-on-primary:#FFFFFF; --md-primary-container:#FFDEA0; --md-on-primary-container:#271900;
-    --md-secondary:#6F5D3E; --md-on-secondary:#FFFFFF; --md-secondary-container:#F8E0B7; --md-on-secondary-container:#271A04;
+    --md-primary:#3E7A34; --md-on-primary:#FFFFFF; --md-primary-container:#C5EABC; --md-on-primary-container:#0A2405;
+    --md-secondary:#52664C; --md-on-secondary:#FFFFFF; --md-secondary-container:#D4EACB; --md-on-secondary-container:#0F1F0B;
     --md-error:#BA1A1A; --md-on-error:#FFFFFF; --md-error-container:#FFDAD6; --md-on-error-container:#410002;
-    --md-success:#3C6B34; --md-on-success-container:#DFF0D8;
-    --md-background:#FFFBF5; --md-surface:#FFFBF5; --md-on-surface:#1F1B13; --md-on-surface-variant:#4F4739;
-    --md-surface-container-low:#FBF3E3; --md-surface-container:#F5EDDC; --md-surface-container-high:#EFE7D6; --md-surface-container-highest:#E9E1D0;
-    --md-outline:#7F7667; --md-outline-variant:#D0C7B5;
+    --md-success:#3E7A34; --md-on-success-container:#DFF0D8;
+    --md-background:#F6FAF3; --md-surface:#F6FAF3; --md-on-surface:#181F16; --md-on-surface-variant:#454F41;
+    --md-surface-container-low:#F0F5EB; --md-surface-container:#EAF0E3; --md-surface-container-high:#E3EBDB; --md-surface-container-highest:#DCE5D3;
+    --md-outline:#767F70; --md-outline-variant:#C4D0BC;
   }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  svg{vertical-align:middle; flex-shrink:0;}
   body{
     background:var(--md-background); color:var(--md-on-surface); font-family:'Roboto',sans-serif;
     min-height:100vh; display:flex; flex-direction:column; transition:background 0.25s, color 0.25s;
@@ -66,29 +67,24 @@
   .section-title:first-child{margin-top:4px;}
 
   /* ---------- Balance card ---------- */
-  .balance-card{background:var(--md-primary-container); color:var(--md-on-primary-container); border-radius:28px; padding:22px 20px; margin-bottom:14px;}
-  .balance-row{display:flex; justify-content:space-between; gap:12px;}
-  .balance-col{flex:1;}
-  .balance-label{font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; opacity:0.8;}
-  .balance-amt{font-size:21px; font-weight:700; margin-top:3px;}
-  .balance-amt.ingreso{color:var(--md-success);}
-  .balance-amt.gasto{color:var(--md-error-container);}
-  .balance-divider{width:1px; background:currentColor; opacity:0.15;}
-  .balance-ahorro{margin-top:16px; padding-top:14px; border-top:1px solid rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:baseline;}
-  .balance-ahorro-label{font-size:12.5px; font-weight:600; opacity:0.85;}
-  .balance-ahorro-amt{font-size:19px; font-weight:700;}
+  /* ---------- Rosco protagonista ---------- */
+  .donut-hero-wrap{display:flex; flex-direction:column; align-items:center; margin:8px 0 6px;}
+  .donut-hero{position:relative; width:76vw; max-width:320px; height:76vw; max-height:320px;}
+  .donut-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
+  .donut-ingresos{font-size:12px; font-weight:600; color:var(--md-success); opacity:0.85;}
+  .donut-gastos-label{font-size:10.5px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.05em; margin-top:6px;}
+  .donut-gastos-amt{font-size:27px; font-weight:700; color:var(--md-on-surface); margin-top:2px;}
+  .ahorro-pill{
+    margin-top:14px; padding:8px 18px; border-radius:100px; background:var(--md-surface-container-high);
+    font-size:12.5px; font-weight:600; color:var(--md-on-surface-variant);
+  }
+  .ahorro-pill span{font-weight:700;}
 
-  /* ---------- Donut + leyenda ---------- */
-  .chart-card{display:flex; align-items:center; gap:18px;}
-  .chart-mini{position:relative; width:118px; height:118px; flex-shrink:0;}
-  .chart-mini-total{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
-  .chart-mini-total-label{font-size:9px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.04em;}
-  .chart-mini-total-amt{font-size:14px; font-weight:700; color:var(--md-on-surface);}
-  .legend-list{flex:1; display:flex; flex-direction:column; gap:9px; min-width:0;}
-  .legend-row{display:flex; align-items:center; gap:9px; cursor:pointer;}
-  .legend-dot{width:11px; height:11px; border-radius:50%; flex-shrink:0;}
-  .legend-name{flex:1; font-size:12.5px; color:var(--md-on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .legend-amt{font-size:12px; font-weight:600; color:var(--md-on-surface-variant); flex-shrink:0;}
+  .legend-list{display:flex; flex-direction:column; gap:4px; min-width:0; margin-top:4px;}
+  .legend-row{display:flex; align-items:center; gap:12px; cursor:pointer; padding:9px 4px;}
+  .legend-icon{width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .legend-name{flex:1; font-size:13px; font-weight:500; color:var(--md-on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .legend-amt{font-size:12.5px; font-weight:700; color:var(--md-on-surface-variant); flex-shrink:0;}
   .empty-state{color:var(--md-on-surface-variant); font-size:13.5px; text-align:center; padding:24px 12px; line-height:1.6;}
 
   /* ---------- Chips (filtros informativos) ---------- */
@@ -242,33 +238,19 @@
   <!-- RESUMEN -->
   <div class="view active" id="view-resumen">
     <div class="screen">
-      <div class="balance-card">
-        <div class="balance-row">
-          <div class="balance-col">
-            <div class="balance-label">Ingresos</div>
-            <div class="balance-amt ingreso" id="r-ingresos">0,00 €</div>
-          </div>
-          <div class="balance-col" style="text-align:right;">
-            <div class="balance-label">Gastos</div>
-            <div class="balance-amt gasto" id="r-gastos">0,00 €</div>
+      <div class="donut-hero-wrap">
+        <div class="donut-hero">
+          <canvas id="chart-categorias"></canvas>
+          <div class="donut-center">
+            <div class="donut-ingresos" id="r-ingresos">Ingresos: 0,00 €</div>
+            <div class="donut-gastos-label">gastado este mes</div>
+            <div class="donut-gastos-amt" id="r-gastos">0,00 €</div>
           </div>
         </div>
-        <div class="balance-ahorro">
-          <div class="balance-ahorro-label">Ahorro del mes</div>
-          <div class="balance-ahorro-amt" id="r-ahorro">0,00 €</div>
-        </div>
+        <div class="ahorro-pill">Ahorro del mes: <span id="r-ahorro">0,00 €</span></div>
       </div>
 
-      <div class="m3-card chart-card">
-        <div class="chart-mini">
-          <canvas id="chart-categorias"></canvas>
-          <div class="chart-mini-total">
-            <div class="chart-mini-total-label">Total</div>
-            <div class="chart-mini-total-amt" id="chart-total-mini">0 €</div>
-          </div>
-        </div>
-        <div class="legend-list" id="legend-list"></div>
-      </div>
+      <div class="legend-list" id="legend-list"></div>
 
       <div class="spinner" id="capture-spinner"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span> Leyendo ticket con IA…</div>
 
@@ -360,15 +342,15 @@
   <div class="sheet-box">
     <div class="sheet-handle"></div>
     <div class="sheet-option" id="sheet-camara">
-      <div class="sheet-option-icon">📷</div>
+      <div class="sheet-option-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.6"/></svg></div>
       <div class="sheet-option-text">Escanear ticket</div>
     </div>
     <div class="sheet-option" id="sheet-galeria">
-      <div class="sheet-option-icon">🖼️</div>
+      <div class="sheet-option-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M20.5 15l-5-5-9 9"/></svg></div>
       <div class="sheet-option-text">Elegir de la galería</div>
     </div>
     <div class="sheet-option" id="sheet-manual">
-      <div class="sheet-option-icon">✏️</div>
+      <div class="sheet-option-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4.5-1L19 8.5a1.5 1.5 0 0 0 0-2.1l-1.4-1.4a1.5 1.5 0 0 0-2.1 0L5 15.5z"/><path d="M14.5 6.5l3 3"/></svg></div>
       <div class="sheet-option-text">Gasto manual</div>
     </div>
   </div>
@@ -418,7 +400,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.0.0"></script>
-<script src="./app.js?v=4.0.0"></script>
+<script src="./config.js?v=4.1.0"></script>
+<script src="./app.js?v=4.1.0"></script>
 </body>
 </html>

@@ -8,5 +8,5 @@ const CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_t32NKHn4L03LjMuyvGIXfQ_QJv5PGu5',
   FUNCTIONS_URL: 'https://gucyvkcsbwxprbfdcfha.supabase.co/functions/v1',
   ADMIN_EMAIL: 'rbcheca@gmail.com',
-  APP_VERSION: '4.0.0',
+  APP_VERSION: '4.1.0',
 };

@@ -5,16 +5,34 @@
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
 const CAT_COLORS = {
-  'alimentación': '#96C36E', 'higiene personal': '#7FB8B0', 'limpieza': '#7FA8D9',
-  'vivienda': '#D98F6F', 'transporte': '#C7A96B', 'salud': '#D98A9E',
-  'ocio': '#B08FD9', 'compras': '#C79A5C', 'otros': '#9C9585',
+  'alimentación': '#9FCB8E', 'higiene personal': '#8FCBBE', 'limpieza': '#8EB8CB',
+  'vivienda': '#CBB68E', 'transporte': '#CBAF8E', 'salud': '#CB8E9F',
+  'ocio': '#B08ECB', 'compras': '#CBC28E', 'otros': '#A9A99A',
 };
-const CAT_ICONOS = {
-  'alimentación': '🛒', 'higiene personal': '🧴', 'limpieza': '🧽',
-  'vivienda': '🏠', 'transporte': '🚗', 'salud': '❤️',
-  'ocio': '🎉', 'compras': '🛍️', 'otros': '❓',
+const PALETA_RESPALDO = ['#9FCB8E', '#8FCBBE', '#8EB8CB', '#CBB68E', '#CBAF8E', '#CB8E9F', '#B08ECB', '#CBC28E', '#A9A99A'];
+
+// Iconos propios en SVG, mismo estilo de trazo fino en todos (24x24, stroke 1.7)
+const ICONOS_SVG = {
+  'alimentación': '<path d="M12 21c-4.5 0-7-3.6-7-7.8C5 8.6 8 6 12 6s7 2.6 7 7.2c0 4.2-2.5 7.8-7 7.8z"/><path d="M12 6c0-1.8 1.3-3 3-3"/>',
+  'higiene personal': '<path d="M12 3s5.5 6.2 5.5 10.5A5.5 5.5 0 0 1 6.5 13.5C6.5 9.2 12 3 12 3z"/>',
+  'limpieza': '<path d="M9.5 21V10.5a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2V21z"/><path d="M11 8.5V5.5h2v3"/><path d="M13 5.5l2.8-2"/><path d="M13 8.5h3.8"/>',
+  'vivienda': '<path d="M4 11.5l8-7.3 8 7.3"/><path d="M6 10.3V20a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9.7"/>',
+  'transporte': '<path d="M4.5 16v-3.2l1.8-4.6a1.5 1.5 0 0 1 1.4-1h8.6a1.5 1.5 0 0 1 1.4 1l1.8 4.6V16"/><path d="M4.5 16h15"/><circle cx="8" cy="17.6" r="1.5"/><circle cx="16" cy="17.6" r="1.5"/>',
+  'salud': '<path d="M12 20.3s-7.3-4.5-9-9.2C1.6 7.8 3 4.9 5.9 4.2 8 3.7 10 4.7 12 7c2-2.3 4-3.3 6.1-2.8 2.9.7 4.3 3.6 3.1 6.9-1.7 4.7-9.2 9.2-9.2 9.2z"/>',
+  'ocio': '<path d="M12 3.2l2.5 5.6 6.1.6-4.6 4.1 1.4 6-5.4-3.2-5.4 3.2 1.4-6-4.6-4.1 6.1-.6z"/>',
+  'compras': '<path d="M6.2 9h11.6l1 11.2a1 1 0 0 1-1 1.1H6.2a1 1 0 0 1-1-1.1z"/><path d="M9 9V6.8a3 3 0 0 1 6 0V9"/>',
+  'otros': '<path d="M20 12.3l-7.7 7.7-9-9V4.5h6.5z"/><circle cx="7.5" cy="7.5" r="1.1" fill="currentColor" stroke="none"/>',
 };
-const PALETA_RESPALDO = ['#96C36E', '#7FB8B0', '#7FA8D9', '#D98F6F', '#C7A96B', '#D98A9E', '#B08FD9', '#C79A5C', '#9C9585'];
+function iconoSVG(nombre, size) {
+  const s = size || 16;
+  const path = ICONOS_SVG[(nombre || '').toLowerCase()] || '<circle cx="12" cy="12" r="8"/>';
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+const ICONO_RECIBO = '<path d="M6 3h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 8h6M9 11h6M9 14h3.5"/>';
+const ICONO_PAPELERA = '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>';
+function svgInline(pathInner, size, strokeWidth) {
+  return `<svg width="${size || 16}" height="${size || 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth || 1.7}" stroke-linecap="round" stroke-linejoin="round">${pathInner}</svg>`;
+}
 
 function colorCategoria(nombre) {
   const k = (nombre || '').toLowerCase();
@@ -24,8 +42,8 @@ function colorCategoria(nombre) {
   return PALETA_RESPALDO[Math.abs(hash) % PALETA_RESPALDO.length];
 }
 function iconoCategoria(nombre) {
-  const k = (nombre || '').toLowerCase();
-  return CAT_ICONOS[k] || '🏷️';
+  // Mantiene compatibilidad: ahora devuelve el SVG en vez de un emoji
+  return iconoSVG(nombre, 16);
 }
 function euros(n) { return (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
 function fechaLocal(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
@@ -41,7 +59,7 @@ let chartCategorias = null;
 
 function poblarSelectCategorias(sel, categoriaIdActual) {
   const activas = categoriasCache.filter((c) => c.activa);
-  sel.innerHTML = activas.map((c) => `<option value="${c.id}" ${c.id === categoriaIdActual ? 'selected' : ''}>${iconoCategoria(c.nombre)} ${c.nombre}</option>`).join('');
+  sel.innerHTML = activas.map((c) => `<option value="${c.id}" ${c.id === categoriaIdActual ? 'selected' : ''}>${c.nombre}</option>`).join('');
   if (!categoriaIdActual && activas.length) sel.value = activas[0].id;
 }
 
@@ -514,10 +532,10 @@ async function cargarDashboard() {
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
   const ahorro = totalIngresos - total;
 
-  document.getElementById('r-ingresos').textContent = euros(totalIngresos);
+  document.getElementById('r-ingresos').textContent = 'Ingresos: ' + euros(totalIngresos);
   document.getElementById('r-gastos').textContent = euros(total);
   document.getElementById('r-ahorro').textContent = euros(ahorro);
-  document.getElementById('r-ahorro').style.color = ahorro >= 0 ? 'var(--md-success)' : 'var(--md-error-container)';
+  document.getElementById('r-ahorro').style.color = ahorro >= 0 ? 'var(--md-success)' : 'var(--md-error)';
 
   const porCategoria = {};
   data.forEach((g) => {
@@ -525,12 +543,11 @@ async function cargarDashboard() {
     porCategoria[nombre] = (porCategoria[nombre] || 0) + Number(g.importe);
   });
 
-  dibujarDonut(porCategoria, total);
+  dibujarDonut(porCategoria);
   renderMovimientos(data, comercioPorTicket, 'movimientos-list', false);
 }
 
-function dibujarDonut(porCategoria, total) {
-  document.getElementById('chart-total-mini').textContent = total >= 1000 ? Math.round(total) + ' €' : euros(total);
+function dibujarDonut(porCategoria) {
   const labels = Object.keys(porCategoria);
   const valores = Object.values(porCategoria);
 
@@ -541,7 +558,7 @@ function dibujarDonut(porCategoria, total) {
       chartCategorias = new Chart(canvas, {
         type: 'doughnut',
         data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorCategoria), borderWidth: 0 }] },
-        options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } } },
+        options: { cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } } },
       });
     }
   } catch (err) {
@@ -549,11 +566,11 @@ function dibujarDonut(porCategoria, total) {
   }
 
   const legend = document.getElementById('legend-list');
-  const ordenado = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const ordenado = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
   legend.innerHTML = ordenado.map(([nombre, importe]) => `
     <div class="legend-row" data-nombre="${nombre}">
-      <div class="legend-dot" style="background:${colorCategoria(nombre)}"></div>
-      <div class="legend-name">${iconoCategoria(nombre)} ${nombre}</div>
+      <div class="legend-icon" style="background:${colorCategoria(nombre)}40; color:${colorCategoria(nombre)};">${iconoSVG(nombre, 16)}</div>
+      <div class="legend-name">${nombre}</div>
       <div class="legend-amt">${euros(importe)}</div>
     </div>
   `).join('') || '<div class="empty-state" style="padding:0;">Sin gastos este mes.</div>';
@@ -573,7 +590,7 @@ async function abrirDetalleCategoria(nombreCat) {
   const { data } = await sb.from('gastos').select('*').eq('categoria_id', catId).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
   const total = (data || []).reduce((a, g) => a + Number(g.importe), 0);
 
-  document.getElementById('modal-cat-titulo').textContent = `${iconoCategoria(nombreCat)} ${nombreCat} — ${euros(total)}`;
+  document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(nombreCat, 16)} ${nombreCat} — ${euros(total)}`;
   document.getElementById('modal-cat-contenido').innerHTML = (data || []).map((g) => `
     <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
       <span>${g.descripcion}</span>
@@ -615,14 +632,14 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
       return `
         <div class="ticket-card" data-ticket-id="${e.ticketId}">
           <div class="ticket-card-header">
-            <div class="ticket-card-icon" style="background:${colorCategoria(e.items[0] ? nombreCategoria(e.items[0].categoria_id) : 'otros')}33;">🧾</div>
+            <div class="ticket-card-icon" style="background:${colorCategoria(e.items[0] ? nombreCategoria(e.items[0].categoria_id) : 'otros')}33; color:${colorCategoria(e.items[0] ? nombreCategoria(e.items[0].categoria_id) : 'otros')};">${svgInline(ICONO_RECIBO, 18)}</div>
             <div class="ticket-card-info">
               <div class="ticket-card-name">${e.comercio}</div>
               <div class="ticket-card-date">${new Date(e.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
             </div>
             <div class="ticket-card-amt">${euros(e.total)}</div>
             <span class="ticket-chevron">▾</span>
-            <button class="ticket-delete-btn" data-ticket-id="${e.ticketId}">🗑</button>
+            <button class="ticket-delete-btn" data-ticket-id="${e.ticketId}">${svgInline(ICONO_PAPELERA, 15)}</button>
           </div>
           <div class="ticket-card-detail">
             ${e.items.map((it) => `
@@ -639,7 +656,7 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
     return `
       <div class="ticket-card">
         <div class="ticket-card-header" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}" style="cursor:pointer;">
-          <div class="ticket-card-icon" style="background:${colorCategoria(nombreCategoria(g.categoria_id))}33;">${iconoCategoria(nombreCategoria(g.categoria_id))}</div>
+          <div class="ticket-card-icon" style="background:${colorCategoria(nombreCategoria(g.categoria_id))}33; color:${colorCategoria(nombreCategoria(g.categoria_id))};">${iconoCategoria(nombreCategoria(g.categoria_id))}</div>
           <div class="ticket-card-info">
             <div class="ticket-card-name">${g.descripcion} ${e.tipo === 'manual' ? '<span class="manual-tag">· manual</span>' : ''}</div>
             <div class="ticket-card-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
@@ -702,7 +719,7 @@ function abrirDetalleEtiquetaGeneral(etiqueta, data) {
     return etiqueta === 'Otros' ? !ETIQUETAS_TICKETS.slice(0, 3).includes(nombre) : nombre === etiqueta;
   });
   const total = items.reduce((a, g) => a + Number(g.importe), 0);
-  document.getElementById('modal-cat-titulo').textContent = `${iconoCategoria(etiqueta)} ${etiqueta} — ${euros(total)}`;
+  document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(etiqueta, 16)} ${etiqueta} — ${euros(total)}`;
   document.getElementById('modal-cat-contenido').innerHTML = items.map((g) => `
     <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
       <span>${g.descripcion}</span><span>${euros(g.importe)}</span>
