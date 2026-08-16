@@ -8,8 +8,14 @@ const CAT_COLORS = {
   'alimentación': '#9FCB8E', 'higiene personal': '#8FCBBE', 'limpieza': '#8EB8CB',
   'vivienda': '#CBB68E', 'transporte': '#CBAF8E', 'salud': '#CB8E9F',
   'ocio': '#B08ECB', 'compras': '#CBC28E', 'otros': '#A9A99A',
+  'préstamos': '#8E9ECB',
 };
-const PALETA_RESPALDO = ['#9FCB8E', '#8FCBBE', '#8EB8CB', '#CBB68E', '#CBAF8E', '#CB8E9F', '#B08ECB', '#CBC28E', '#A9A99A'];
+// Paleta de respaldo para categorías personalizadas que el usuario añada,
+// con más colores de los que hacen falta para evitar que se repitan
+const PALETA_RESPALDO = [
+  '#D9A6CB', '#A6CBB0', '#CB9E8E', '#8ECBC0', '#CBB98E',
+  '#9E8ECB', '#CB8EA9', '#8EAECB', '#B9CB8E', '#CB8E71',
+];
 
 // Iconos propios en SVG, mismo estilo de trazo fino en todos (24x24, stroke 1.7)
 const ICONOS_SVG = {
@@ -22,6 +28,7 @@ const ICONOS_SVG = {
   'ocio': '<path d="M12 3.2l2.5 5.6 6.1.6-4.6 4.1 1.4 6-5.4-3.2-5.4 3.2 1.4-6-4.6-4.1 6.1-.6z"/>',
   'compras': '<path d="M6.2 9h11.6l1 11.2a1 1 0 0 1-1 1.1H6.2a1 1 0 0 1-1-1.1z"/><path d="M9 9V6.8a3 3 0 0 1 6 0V9"/>',
   'otros': '<path d="M20 12.3l-7.7 7.7-9-9V4.5h6.5z"/><circle cx="7.5" cy="7.5" r="1.1" fill="currentColor" stroke="none"/>',
+  'préstamos': '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10.5h18"/><path d="M6.5 14.5h4"/>',
 };
 function iconoSVG(nombre, size) {
   const s = size || 16;
@@ -34,12 +41,29 @@ function svgInline(pathInner, size, strokeWidth) {
   return `<svg width="${size || 16}" height="${size || 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth || 1.7}" stroke-linecap="round" stroke-linejoin="round">${pathInner}</svg>`;
 }
 
+let coloresAsignados = {};
+
 function colorCategoria(nombre) {
   const k = (nombre || '').toLowerCase();
-  if (CAT_COLORS[k]) return CAT_COLORS[k];
-  let hash = 0;
-  for (let i = 0; i < k.length; i++) hash = k.charCodeAt(i) + ((hash << 5) - hash);
-  return PALETA_RESPALDO[Math.abs(hash) % PALETA_RESPALDO.length];
+  return coloresAsignados[k] || '#A9A99A';
+}
+function asignarColores() {
+  coloresAsignados = {};
+  const usados = new Set();
+  const pendientes = [];
+
+  // 1º pasada: categorías con color fijo conocido
+  categoriasCache.forEach((c) => {
+    const k = c.nombre.toLowerCase();
+    if (CAT_COLORS[k]) { coloresAsignados[k] = CAT_COLORS[k]; usados.add(CAT_COLORS[k]); }
+    else pendientes.push(k);
+  });
+  // 2º pasada: categorías personalizadas, un color libre de la paleta de respaldo cada una
+  pendientes.forEach((k) => {
+    const libre = PALETA_RESPALDO.find((c) => !usados.has(c)) || '#A9A99A';
+    coloresAsignados[k] = libre;
+    usados.add(libre);
+  });
 }
 function iconoCategoria(nombre) {
   // Mantiene compatibilidad: ahora devuelve el SVG en vez de un emoji
@@ -130,6 +154,7 @@ async function cargarCategorias() {
   const { data, error } = await sb.from('categorias').select('*').order('orden');
   if (error) { alert('No se pudieron cargar las categorías: ' + error.message); return; }
   categoriasCache = data;
+  asignarColores();
 }
 
 function renderCategorias() {
