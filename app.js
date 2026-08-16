@@ -19,7 +19,7 @@ const PALETA_RESPALDO = [
 
 // Iconos propios en SVG, mismo estilo de trazo fino en todos (24x24, stroke 1.7)
 const ICONOS_SVG = {
-  'alimentación': '<path d="M12 21c-4.5 0-7-3.6-7-7.8C5 8.6 8 6 12 6s7 2.6 7 7.2c0 4.2-2.5 7.8-7 7.8z"/><path d="M12 6c0-1.8 1.3-3 3-3"/>',
+  'alimentación': '<path d="M7 2v7.5c0 1.7-1.1 2.5-2.5 2.5v0"/><path d="M7 2v7.5c0 1.7 1.1 2.5 2.5 2.5v0"/><path d="M5.8 2v6M8.2 2v6M7 12v10"/><path d="M17 2c-1.9 0-3.2 2.3-3.2 5.5S15.1 13 17 13v9"/>',
   'higiene personal': '<path d="M12 3s5.5 6.2 5.5 10.5A5.5 5.5 0 0 1 6.5 13.5C6.5 9.2 12 3 12 3z"/>',
   'limpieza': '<path d="M9.5 21V10.5a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2V21z"/><path d="M11 8.5V5.5h2v3"/><path d="M13 5.5l2.8-2"/><path d="M13 8.5h3.8"/>',
   'vivienda': '<path d="M4 11.5l8-7.3 8 7.3"/><path d="M6 10.3V20a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9.7"/>',
@@ -28,7 +28,7 @@ const ICONOS_SVG = {
   'ocio': '<path d="M12 3.2l2.5 5.6 6.1.6-4.6 4.1 1.4 6-5.4-3.2-5.4 3.2 1.4-6-4.6-4.1 6.1-.6z"/>',
   'compras': '<path d="M6.2 9h11.6l1 11.2a1 1 0 0 1-1 1.1H6.2a1 1 0 0 1-1-1.1z"/><path d="M9 9V6.8a3 3 0 0 1 6 0V9"/>',
   'otros': '<path d="M20 12.3l-7.7 7.7-9-9V4.5h6.5z"/><circle cx="7.5" cy="7.5" r="1.1" fill="currentColor" stroke="none"/>',
-  'préstamos': '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10.5h18"/><path d="M6.5 14.5h4"/>',
+  'préstamos': '<circle cx="12" cy="12" r="8.5"/><path d="M15 8.3c-.7-.5-1.6-.8-2.5-.8-2.3 0-4.1 2-4.1 4.5s1.8 4.5 4.1 4.5c.9 0 1.8-.3 2.5-.8"/><path d="M7 10.3h5.5M7 13.2h4.7"/>',
 };
 function iconoSVG(nombre, size) {
   const s = size || 16;
