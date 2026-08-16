@@ -4,187 +4,220 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=3.3.2">
-<meta name="theme-color" content="#2B2622">
+<link rel="manifest" href="./manifest.json?v=4.0.0">
+<meta name="theme-color" content="#14120E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
   :root{
-    --c1:#d9b34a; --c2:#a75d35; --c3:#c9a769; --c4:#6f4c3e; --c5:#e5c9a9; --c6:#8f7a3d; --c7:#5c3a2e; --c8:#b98b56;
-    --fondo:#2B2622; --panel:#F5F0E6; --panel-sombra:#E6DDC9;
-    --tinta:#231F1A; --tinta-suave:#6E655A; --linea:#DDD2BC;
-    --verde:#5C8A5C; --rojo:#B5533E; --ambar:#d9b34a;
-    --texto-app:#EDE6D6; --texto-app-suave:#8a8175;
+    --md-primary:#E8C077; --md-on-primary:#3F2E00; --md-primary-container:#5C4400; --md-on-primary-container:#FFDEA0;
+    --md-secondary:#D3C0A3; --md-on-secondary:#382F1B; --md-secondary-container:#4F452C; --md-on-secondary-container:#F0DEBC;
+    --md-error:#FFB4AB; --md-on-error:#690005; --md-error-container:#93000A; --md-on-error-container:#FFDAD6;
+    --md-success:#A8D2A0; --md-on-success-container:#0C2007;
+    --md-background:#14120E; --md-surface:#14120E; --md-on-surface:#E8E1D4; --md-on-surface-variant:#CBC3B3;
+    --md-surface-container-low:#1C1A15; --md-surface-container:#201E18; --md-surface-container-high:#2B2820; --md-surface-container-highest:#363228;
+    --md-outline:#948E7F; --md-outline-variant:#4B4639;
   }
   body.tema-claro{
-    --fondo:#F3EEE3; --panel:#FFFFFF; --panel-sombra:#EDE6D6;
-    --texto-app:#231F1A; --texto-app-suave:#7a7166;
+    --md-primary:#7A5900; --md-on-primary:#FFFFFF; --md-primary-container:#FFDEA0; --md-on-primary-container:#271900;
+    --md-secondary:#6F5D3E; --md-on-secondary:#FFFFFF; --md-secondary-container:#F8E0B7; --md-on-secondary-container:#271A04;
+    --md-error:#BA1A1A; --md-on-error:#FFFFFF; --md-error-container:#FFDAD6; --md-on-error-container:#410002;
+    --md-success:#3C6B34; --md-on-success-container:#DFF0D8;
+    --md-background:#FFFBF5; --md-surface:#FFFBF5; --md-on-surface:#1F1B13; --md-on-surface-variant:#4F4739;
+    --md-surface-container-low:#FBF3E3; --md-surface-container:#F5EDDC; --md-surface-container-high:#EFE7D6; --md-surface-container-highest:#E9E1D0;
+    --md-outline:#7F7667; --md-outline-variant:#D0C7B5;
   }
-  *{box-sizing:border-box; margin:0; padding:0;}
-  body{background:var(--fondo); font-family:'Inter',sans-serif; min-height:100vh; display:flex; flex-direction:column; transition:background 0.2s;}
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  body{
+    background:var(--md-background); color:var(--md-on-surface); font-family:'Roboto',sans-serif;
+    min-height:100vh; display:flex; flex-direction:column; transition:background 0.25s, color 0.25s;
+    font-variant-numeric:tabular-nums;
+  }
 
-  #login-screen{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;}
-  .login-card{background:var(--panel); border-radius:12px; padding:28px 24px; width:100%; max-width:340px; box-shadow:0 18px 30px -12px rgba(0,0,0,0.5);}
-  .login-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:24px; color:var(--tinta); margin-bottom:4px;}
-  .login-sub{font-size:12.5px; color:var(--tinta-suave); margin-bottom:20px;}
-  .login-card input{width:100%; padding:12px 13px; border-radius:8px; border:1.5px solid var(--linea); background:#fff; font-size:14px; margin-bottom:10px;}
-  .login-card button{width:100%; padding:13px; border-radius:8px; border:none; background:var(--verde); color:#fff; font-family:'Oswald',sans-serif; font-weight:600; font-size:14px; text-transform:uppercase; margin-top:6px;}
-  #login-error{color:var(--rojo); font-size:12px; margin-top:8px; display:none;}
+  /* ---------- LOGIN ---------- */
+  #login-screen{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:var(--md-background);}
+  .login-card{background:var(--md-surface-container); border-radius:28px; padding:32px 26px; width:100%; max-width:340px;}
+  .login-title{font-weight:700; font-size:26px; color:var(--md-on-surface); margin-bottom:4px;}
+  .login-sub{font-size:13px; color:var(--md-on-surface-variant); margin-bottom:22px;}
+  .login-card input{
+    width:100%; padding:15px 16px; border-radius:14px; border:1px solid var(--md-outline-variant);
+    background:var(--md-surface-container-high); color:var(--md-on-surface); font-size:15px; margin-bottom:12px; font-family:inherit;
+  }
+  .login-card button{
+    width:100%; padding:15px; border-radius:100px; border:none; background:var(--md-primary); color:var(--md-on-primary);
+    font-weight:600; font-size:15px; margin-top:6px;
+  }
+  #login-error{color:var(--md-error); font-size:12.5px; margin-top:10px; display:none;}
 
+  /* ---------- APP SHELL ---------- */
   #app{display:none; flex-direction:column; min-height:100vh;}
-  .topbar{padding:16px 18px 10px; display:flex; align-items:center; gap:10px;}
-  .wordmark{font-family:'Oswald',sans-serif; font-weight:600; font-size:16px; letter-spacing:0.05em; color:var(--texto-app); text-transform:uppercase;}
-  .wordmark span{color:var(--ambar);}
-  .version-tag{font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--texto-app-suave);}
+  .topbar{padding:20px 20px 4px;}
+  .topbar-title{font-size:15px; font-weight:600; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.08em;}
+  .topbar-month{font-size:26px; font-weight:700; color:var(--md-on-surface); text-transform:capitalize; margin-top:2px;}
 
   .view{display:none;}
   .view.active{display:block;}
-  .screen{padding:0 16px 8px; flex:1; overflow-y:auto; padding-bottom:186px;}
+  .screen{padding:12px 16px 110px;}
 
-  /* ---------- RESUMEN: donut ---------- */
-  .chart-wrap-hero{position:relative; width:88vw; max-width:400px; height:88vw; max-height:400px; margin:6px auto 22px;}
-  .chart-canvas-holder{position:absolute; top:19%; left:19%; width:62%; height:62%;}
-  .chart-center{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none; width:55%;}
-  .chart-center-ingresos{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:19px; color:var(--verde);}
-  .chart-center-gastos{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:19px; color:var(--rojo); margin-top:4px;}
-  .cat-label{position:absolute; text-align:center; width:56px; transform:translate(-50%,-50%); cursor:pointer;}
-  .cat-label-icon{width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; margin:0 auto 3px; box-shadow:0 3px 8px -2px rgba(0,0,0,0.5);}
-  .cat-label-pct{font-size:10.5px; color:var(--texto-app); font-family:'JetBrains Mono',monospace;}
-  .cat-line-svg{position:absolute; inset:0; width:100%; height:100%; pointer-events:none;}
+  /* ---------- CARDS genéricas M3 ---------- */
+  .m3-card{background:var(--md-surface-container); border-radius:24px; padding:18px; margin-bottom:14px;}
+  .section-title{font-size:12.5px; font-weight:700; color:var(--md-primary); text-transform:uppercase; letter-spacing:0.06em; margin:22px 4px 10px;}
+  .section-title:first-child{margin-top:4px;}
 
-  .recent-label{font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--texto-app-suave); margin:8px 0 10px;}
+  /* ---------- Balance card ---------- */
+  .balance-card{background:var(--md-primary-container); color:var(--md-on-primary-container); border-radius:28px; padding:22px 20px; margin-bottom:14px;}
+  .balance-row{display:flex; justify-content:space-between; gap:12px;}
+  .balance-col{flex:1;}
+  .balance-label{font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; opacity:0.8;}
+  .balance-amt{font-size:21px; font-weight:700; margin-top:3px;}
+  .balance-amt.ingreso{color:var(--md-success);}
+  .balance-amt.gasto{color:var(--md-error-container);}
+  .balance-divider{width:1px; background:currentColor; opacity:0.15;}
+  .balance-ahorro{margin-top:16px; padding-top:14px; border-top:1px solid rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:baseline;}
+  .balance-ahorro-label{font-size:12.5px; font-weight:600; opacity:0.85;}
+  .balance-ahorro-amt{font-size:19px; font-weight:700;}
 
-  .ticket-group{background:var(--panel); border-radius:8px; margin-bottom:8px; overflow:hidden;}
-  .ticket-group-header{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer;}
-  .ticket-group-info{display:flex; align-items:center; gap:10px;}
-  .ticket-group-name{color:var(--tinta); font-weight:600; font-size:13.5px;}
-  .ticket-group-date{font-size:10.5px; color:var(--tinta-suave); font-family:'JetBrains Mono',monospace;}
-  .ticket-group-amt{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--tinta); margin-left:auto; margin-right:10px;}
-  .ticket-delete-btn{background:none; border:none; font-size:15px; opacity:0.55; padding:4px; flex-shrink:0;}
-  .chevron{color:var(--tinta-suave); font-size:11px; transition:transform 0.2s;}
-  .ticket-group.open .chevron{transform:rotate(180deg);}
-  .ticket-group-detail{display:none; padding:0 14px 12px; border-top:1px dashed var(--linea);}
-  .ticket-group.open .ticket-group-detail{display:block;}
-  .ticket-item-row{display:flex; justify-content:space-between; padding:8px 0; font-size:12.5px; color:var(--tinta); cursor:pointer; border-bottom:1px dotted var(--linea);}
-  .ticket-item-row:last-child{border-bottom:none;}
-  .cat-dot-inline{width:6px; height:6px; border-radius:50%; display:inline-block; margin-right:7px;}
-  .gasto-row{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:var(--panel); border-radius:8px; margin-bottom:8px; cursor:pointer;}
-  .gasto-left{display:flex; align-items:center; gap:10px;}
-  .gasto-dot{width:8px; height:8px; border-radius:50%;}
-  .gasto-name{color:var(--tinta); font-size:13.5px; font-weight:600;}
-  .gasto-date{color:var(--tinta-suave); font-size:10.5px; font-family:'JetBrains Mono',monospace; margin-top:1px;}
-  .gasto-amt{font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:var(--tinta);}
-  .empty-state{color:var(--texto-app-suave); font-size:13px; text-align:center; margin-top:20px; line-height:1.6;}
+  /* ---------- Donut + leyenda ---------- */
+  .chart-card{display:flex; align-items:center; gap:18px;}
+  .chart-mini{position:relative; width:118px; height:118px; flex-shrink:0;}
+  .chart-mini-total{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
+  .chart-mini-total-label{font-size:9px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.04em;}
+  .chart-mini-total-amt{font-size:14px; font-weight:700; color:var(--md-on-surface);}
+  .legend-list{flex:1; display:flex; flex-direction:column; gap:9px; min-width:0;}
+  .legend-row{display:flex; align-items:center; gap:9px; cursor:pointer;}
+  .legend-dot{width:11px; height:11px; border-radius:50%; flex-shrink:0;}
+  .legend-name{flex:1; font-size:12.5px; color:var(--md-on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .legend-amt{font-size:12px; font-weight:600; color:var(--md-on-surface-variant); flex-shrink:0;}
+  .empty-state{color:var(--md-on-surface-variant); font-size:13.5px; text-align:center; padding:24px 12px; line-height:1.6;}
 
-  /* ---------- TICKETS: chips ---------- */
-  .chip-row{display:flex; gap:8px; overflow-x:auto; padding:4px 0 14px; margin:0 -16px; padding-left:16px;}
+  /* ---------- Chips (filtros informativos) ---------- */
+  .chip-row{display:flex; gap:8px; overflow-x:auto; padding:2px 0 4px; margin:0 -16px; padding-left:16px;}
   .chip-row::-webkit-scrollbar{display:none;}
-  .filtro-chip{
-    flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 14px; border-radius:20px;
-    border:1.5px solid var(--linea); background:var(--panel); font-size:12.5px; font-weight:600; color:var(--tinta); cursor:pointer;
+  .m3-chip{
+    flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 15px; border-radius:100px;
+    border:1px solid var(--md-outline-variant); background:var(--md-surface-container); font-size:12.5px; font-weight:600; color:var(--md-on-surface);
   }
-  .filtro-chip.active{border-color:transparent; color:#fff;}
-  .filtro-chip .chip-amt{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; opacity:0.85;}
+  .m3-chip .chip-amt{font-weight:700; font-size:11.5px; color:var(--md-primary);}
 
-  /* ---------- ACTION BAR (persistente) ---------- */
-  .actionbar{position:fixed; bottom:64px; left:0; right:0; display:flex; justify-content:center; align-items:center; gap:24px; padding:10px 0; background:linear-gradient(to top, var(--fondo) 55%, transparent); z-index:20;}
-  .action-circle{border-radius:50%; display:flex; align-items:center; justify-content:center; border:2.5px solid; cursor:pointer; background:var(--fondo);}
-  .action-minus{width:50px; height:50px; border-color:var(--rojo); color:var(--rojo); font-size:26px;}
-  .action-camera{width:62px; height:62px; border-color:var(--ambar); color:var(--ambar); font-size:26px;}
-  .action-gallery{width:50px; height:50px; border-color:var(--texto-app-suave); color:var(--texto-app); font-size:20px;}
+  /* ---------- Listas de movimientos (tickets/ocasionales) ---------- */
+  .ticket-card{background:var(--md-surface-container); border-radius:20px; margin-bottom:10px; overflow:hidden;}
+  .ticket-card-header{display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer;}
+  .ticket-card-icon{width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;}
+  .ticket-card-info{flex:1; min-width:0;}
+  .ticket-card-name{font-size:14px; font-weight:600; color:var(--md-on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .ticket-card-date{font-size:11px; color:var(--md-on-surface-variant); margin-top:1px;}
+  .ticket-card-amt{font-size:14.5px; font-weight:700; color:var(--md-on-surface); flex-shrink:0;}
+  .ticket-chevron{color:var(--md-on-surface-variant); font-size:12px; transition:transform 0.2s; flex-shrink:0;}
+  .ticket-card.open .ticket-chevron{transform:rotate(180deg);}
+  .ticket-delete-btn{background:none; border:none; font-size:15px; opacity:0.5; padding:4px; flex-shrink:0;}
+  .ticket-card-detail{display:none; padding:0 16px 14px 68px;}
+  .ticket-card.open .ticket-card-detail{display:block;}
+  .ticket-item-row{display:flex; justify-content:space-between; padding:7px 0; font-size:12.5px; color:var(--md-on-surface); cursor:pointer; border-bottom:1px solid var(--md-outline-variant);}
+  .ticket-item-row:last-child{border-bottom:none;}
+  .manual-tag{font-size:9.5px; color:var(--md-on-surface-variant); font-weight:500;}
+
+  /* ---------- FAB + bottom sheet ---------- */
+  .fab{
+    position:fixed; right:20px; bottom:88px; width:60px; height:60px; border-radius:20px; background:var(--md-primary);
+    color:var(--md-on-primary); border:none; font-size:26px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 14px -4px rgba(0,0,0,0.4); z-index:22;
+  }
+  .sheet-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.5); display:none; align-items:flex-end; z-index:60;}
+  .sheet-overlay.open{display:flex;}
+  .sheet-box{background:var(--md-surface-container-high); width:100%; border-radius:28px 28px 0 0; padding:10px 16px calc(24px + env(safe-area-inset-bottom));}
+  .sheet-handle{width:36px; height:4px; background:var(--md-outline-variant); border-radius:4px; margin:6px auto 16px;}
+  .sheet-option{display:flex; align-items:center; gap:16px; padding:15px 8px; border-radius:16px;}
+  .sheet-option:active{background:var(--md-surface-container-highest);}
+  .sheet-option-icon{width:44px; height:44px; border-radius:50%; background:var(--md-secondary-container); color:var(--md-on-secondary-container); display:flex; align-items:center; justify-content:center; font-size:19px;}
+  .sheet-option-text{font-size:15px; font-weight:600; color:var(--md-on-surface);}
 
   input[type=file]{display:none;}
-  .spinner{display:none; text-align:center; color:var(--texto-app-suave); font-size:12px; margin:10px 0;}
-  .spinner.active{display:block;}
+  .spinner{display:none; align-items:center; justify-content:center; gap:8px; text-align:center; color:var(--md-on-surface-variant); font-size:13px; margin:14px 0;}
+  .spinner.active{display:flex;}
+  .spinner-dot{width:6px; height:6px; border-radius:50%; background:var(--md-primary); animation:pulse 1s infinite ease-in-out;}
+  .spinner-dot:nth-child(2){animation-delay:0.15s;} .spinner-dot:nth-child(3){animation-delay:0.3s;}
+  @keyframes pulse{0%,100%{opacity:0.3;} 50%{opacity:1;}}
 
   /* ---------- MODAL genérico ---------- */
-  .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.65); display:none; align-items:center; justify-content:center; z-index:60; padding:20px; overflow-y:auto;}
+  .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:70; padding:20px; overflow-y:auto;}
   .modal-overlay.open{display:flex;}
-  .modal-box{background:var(--panel); border-radius:12px; padding:22px; width:100%; max-width:360px; max-height:88vh; overflow-y:auto;}
-  .modal-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:17px; color:var(--tinta); margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;}
-  .modal-box input, .modal-box select{width:100%; padding:11px 12px; border-radius:8px; border:1.5px solid var(--linea); background:#fff; font-size:13px; margin-bottom:10px; color:var(--tinta);}
-  .modal-row{display:flex; gap:8px;}
+  .modal-box{background:var(--md-surface-container-high); border-radius:28px; padding:24px; width:100%; max-width:380px; max-height:88vh; overflow-y:auto;}
+  .modal-title{font-size:18px; font-weight:700; color:var(--md-on-surface); margin-bottom:18px; display:flex; justify-content:space-between; align-items:center;}
+  .modal-box input, .modal-box select{
+    width:100%; padding:14px 15px; border-radius:14px; border:1px solid var(--md-outline-variant);
+    background:var(--md-surface-container); color:var(--md-on-surface); font-size:14px; margin-bottom:12px; font-family:inherit;
+  }
+  .modal-row{display:flex; gap:10px;}
   .modal-row input, .modal-row select{flex:1;}
-  .modal-check{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--tinta-suave); margin-bottom:16px;}
+  .modal-check{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--md-on-surface-variant); margin-bottom:16px;}
   .modal-check input{width:auto; margin:0;}
-  .modal-actions{display:flex; gap:10px; margin-top:6px;}
-  .btn-secundario{flex:1; background:transparent; border:1.5px solid var(--tinta-suave); color:var(--tinta); font-weight:600; font-size:13px; padding:12px; border-radius:8px;}
-  .btn-primario{flex:1.6; background:var(--verde); border:1.5px solid var(--verde); color:#fff; font-family:'Oswald',sans-serif; font-weight:600; font-size:13.5px; text-transform:uppercase; padding:12px; border-radius:8px;}
-  .modal-close-x{background:none; border:none; font-size:20px; color:var(--tinta-suave); line-height:1;}
+  .modal-actions{display:flex; gap:10px; margin-top:8px;}
+  .btn-tonal{flex:1; background:var(--md-surface-container-highest); border:none; color:var(--md-on-surface); font-weight:600; font-size:13.5px; padding:14px; border-radius:100px;}
+  .btn-filled{flex:1.6; background:var(--md-primary); border:none; color:var(--md-on-primary); font-weight:700; font-size:14px; padding:14px; border-radius:100px;}
+  .btn-danger-text{background:none; border:none; color:var(--md-error); font-weight:600; font-size:13px; padding:10px; width:100%; margin-top:4px;}
+  .modal-close-x{background:none; border:none; font-size:20px; color:var(--md-on-surface-variant); line-height:1;}
 
-  .ticket{background:#fff; color:var(--tinta); border-radius:6px; padding:6px 2px 2px; position:relative;}
-  .comercio{font-family:'Oswald',sans-serif; font-weight:600; font-size:18px; outline:none;}
-  .meta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--tinta-suave); margin-top:4px;}
-  .divider{border:none; border-top:1.5px dashed var(--linea); margin:12px 0;}
-  .item{padding:9px 0; border-bottom:1px dotted var(--linea);}
-  .item-name{font-size:13px; font-weight:500; outline:none; margin-bottom:5px;}
+  .ticket-preview{background:var(--md-surface-container); border-radius:18px; padding:14px 12px;}
+  .comercio-edit{font-size:17px; font-weight:700; color:var(--md-on-surface); outline:none; background:none; border:none; width:100%;}
+  .meta-edit{font-size:11.5px; color:var(--md-on-surface-variant); margin-top:3px;}
+  .divider{border:none; border-top:1px solid var(--md-outline-variant); margin:12px 0;}
+  .item-edit{padding:10px 0; border-bottom:1px solid var(--md-outline-variant);}
+  .item-name-edit{font-size:13.5px; font-weight:500; color:var(--md-on-surface); outline:none; margin-bottom:6px;}
   .item-row2{display:flex; gap:6px; align-items:center;}
-  .item-row2 select{font-size:10.5px; padding:6px 7px; margin-bottom:0;}
-  .item-price{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; outline:none; width:64px; text-align:right; border:1px solid var(--linea); border-radius:6px; padding:5px;}
-  .total-row{display:flex; justify-content:space-between; align-items:baseline; margin-top:10px; padding-top:12px; border-top:2px solid var(--tinta);}
-  .total-label{font-family:'Oswald',sans-serif; font-weight:600; font-size:13px; text-transform:uppercase;}
-  .total-amount{font-family:'JetBrains Mono',monospace; font-size:21px; font-weight:700;}
+  .item-row2 select{font-size:11px; padding:8px 9px; margin-bottom:0;}
+  .item-price-edit{font-weight:700; font-size:13px; outline:none; width:66px; text-align:right; border:1px solid var(--md-outline-variant); border-radius:10px; padding:7px; background:var(--md-surface-container-high); color:var(--md-on-surface);}
+  .total-row{display:flex; justify-content:space-between; align-items:baseline; margin-top:12px; padding-top:12px; border-top:2px solid var(--md-outline);}
+  .total-label{font-weight:700; font-size:13px; text-transform:uppercase; color:var(--md-on-surface-variant);}
+  .total-amount{font-size:21px; font-weight:700; color:var(--md-on-surface);}
 
-  /* ---------- OPCIONES / FIJOS ---------- */
-  .config-section-title{font-family:'Oswald',sans-serif; font-weight:600; font-size:13px; color:var(--ambar); text-transform:uppercase; letter-spacing:0.05em; margin:20px 0 10px;}
-  .config-section-title:first-child{margin-top:6px;}
-  .nomina-card{background:var(--panel); border-radius:10px; padding:14px; display:flex; gap:8px; align-items:center;}
-  .nomina-card input{flex:1; padding:11px 12px; border-radius:8px; border:1.5px solid var(--linea); font-size:14px;}
-  .nomina-card button{background:var(--verde); border:none; border-radius:8px; padding:0 16px; color:#fff; font-family:'Oswald',sans-serif; font-weight:600; font-size:12px; text-transform:uppercase;}
-  .nomina-hint{font-size:10.5px; color:var(--texto-app-suave); margin-top:6px;}
+  /* ---------- Ajustes ---------- */
+  .nomina-row{display:flex; gap:10px; align-items:center;}
+  .nomina-row input{flex:1; padding:14px 15px; border-radius:14px; border:1px solid var(--md-outline-variant); background:var(--md-surface-container-high); color:var(--md-on-surface); font-size:14px;}
+  .nomina-row button{background:var(--md-primary); border:none; border-radius:100px; padding:0 20px; color:var(--md-on-primary); font-weight:700; font-size:13px;}
+  .hint-text{font-size:11.5px; color:var(--md-on-surface-variant); margin-top:8px; padding:0 2px;}
 
-  .fijo-card{background:var(--panel); border-radius:10px; padding:14px 15px; margin-bottom:10px;}
   .fijo-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px; cursor:pointer;}
-  .fijo-name{font-size:14px; font-weight:700; color:var(--tinta);}
-  .fijo-cat{font-size:10.5px; color:var(--tinta-suave); margin-top:2px; display:flex; align-items:center; gap:5px;}
-  .fijo-cat-dot{width:7px; height:7px; border-radius:50%;}
-  .fijo-amt{font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--tinta); text-align:right; white-space:nowrap;}
-  .fijo-amt .approx{font-size:10px; color:var(--tinta-suave); font-weight:500; display:block;}
-  .fijo-bottom{display:flex; justify-content:space-between; align-items:center; margin-top:11px; padding-top:11px; border-top:1px dashed var(--linea);}
-  .fijo-badge{font-size:10px; font-family:'Oswald',sans-serif; text-transform:uppercase; padding:3px 8px; border-radius:20px; font-weight:600; border:none;}
-  .badge-confirmar{background:rgba(181,83,62,0.15); color:var(--rojo);}
-  .badge-proximo{background:rgba(217,179,74,0.2); color:#8a6b1e;}
-  .badge-pagado{background:rgba(92,138,92,0.15); color:var(--verde);}
-  .cal-chip{font-size:10.5px; font-weight:600; color:var(--tinta); background:transparent; border:1.3px solid var(--tinta-suave); border-radius:20px; padding:4px 10px;}
+  .fijo-name{font-size:14.5px; font-weight:700; color:var(--md-on-surface);}
+  .fijo-cat{font-size:11px; color:var(--md-on-surface-variant); margin-top:2px;}
+  .fijo-amt{font-weight:700; color:var(--md-on-surface); text-align:right; white-space:nowrap;}
+  .fijo-amt .approx{font-size:10px; color:var(--md-on-surface-variant); font-weight:500; display:block;}
+  .fijo-bottom{display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid var(--md-outline-variant);}
+  .fijo-badge{font-size:10.5px; font-weight:700; text-transform:uppercase; padding:5px 11px; border-radius:100px; border:none;}
+  .badge-confirmar{background:var(--md-error-container); color:var(--md-on-error-container);}
+  .badge-proximo{background:var(--md-secondary-container); color:var(--md-on-secondary-container);}
+  .badge-pagado{background:rgba(168,210,160,0.2); color:var(--md-success);}
+  .cal-chip{font-size:11px; font-weight:600; color:var(--md-on-surface); background:var(--md-surface-container-highest); border:none; border-radius:100px; padding:6px 12px;}
 
-  .add-fijo{display:flex; flex-direction:column; gap:8px; margin-top:14px; background:rgba(255,255,255,0.04); padding:14px; border-radius:10px;}
-  .add-fijo input, .add-fijo select{background:var(--panel); border:1px solid var(--linea); border-radius:8px; padding:10px 11px; font-size:13px;}
-  .add-fijo button{background:var(--ambar); border:none; border-radius:8px; padding:11px; font-family:'Oswald',sans-serif; font-weight:600; font-size:12px; text-transform:uppercase; color:#2B2622;}
-  .check-inline{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--texto-app-suave);}
+  .add-form{display:flex; flex-direction:column; gap:9px; margin-top:14px; background:var(--md-surface-container-low); padding:16px; border-radius:20px; border:1px dashed var(--md-outline-variant);}
+  .add-form input, .add-form select{background:var(--md-surface-container-high); border:1px solid var(--md-outline-variant); border-radius:12px; padding:12px 13px; font-size:13.5px; color:var(--md-on-surface);}
+  .add-form button{background:var(--md-primary); border:none; border-radius:100px; padding:13px; font-weight:700; font-size:12.5px; color:var(--md-on-primary);}
+  .check-inline{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--md-on-surface-variant);}
   .check-inline input{width:auto;}
 
-  .cat-padre-row{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--panel); border-radius:8px; margin-bottom:6px; cursor:pointer;}
-  .cat-padre-left{display:flex; align-items:center; gap:10px;}
-  .cat-padre-icon{width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px;}
-  .cat-padre-name{font-size:13.5px; font-weight:700; color:var(--tinta);}
-  .cat-hijas{padding:2px 0 8px 30px; display:none;}
-  .cat-padre-row.open + .cat-hijas{display:block;}
-  .cat-hija-row{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; font-size:12px; color:var(--texto-app);}
-  .cat-hija-left{display:flex; align-items:center; gap:8px;}
-  .cat-hija-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
-  .cat-toggle{width:32px; height:18px; border-radius:20px; background:var(--verde); position:relative; border:none;}
-  .cat-toggle::after{content:''; position:absolute; top:2px; right:2px; width:14px; height:14px; border-radius:50%; background:#fff;}
-  .cat-toggle.off{background:#5a5348;}
-  .cat-toggle.off::after{right:auto; left:2px;}
-  .add-subcat{display:flex; gap:6px; padding:8px 10px;}
-  .add-subcat input{flex:1; background:transparent; border:1px dashed #5a5348; border-radius:6px; padding:8px 9px; font-size:12px; color:var(--texto-app);}
-  .add-subcat button{background:var(--ambar); border:none; border-radius:6px; width:34px; color:#2B2622; font-weight:700;}
+  .cat-row{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--md-surface-container); border-radius:18px; margin-bottom:7px;}
+  .cat-row-left{display:flex; align-items:center; gap:11px;}
+  .cat-icon-circ{width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px;}
+  .cat-name{font-size:13.5px; font-weight:600; color:var(--md-on-surface);}
+  .m3-switch{width:36px; height:20px; border-radius:20px; background:var(--md-success); position:relative; border:none;}
+  .m3-switch::after{content:''; position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%; background:#fff;}
+  .m3-switch.off{background:var(--md-outline-variant);}
+  .m3-switch.off::after{right:auto; left:2px; background:var(--md-on-surface-variant);}
 
-  .toggle-row{display:flex; justify-content:space-between; align-items:center; background:var(--panel); border-radius:10px; padding:14px; margin-bottom:8px;}
-  .toggle-row-label{font-size:13.5px; font-weight:600; color:var(--tinta);}
-  .toggle-row-sub{font-size:10.5px; color:var(--tinta-suave); margin-top:2px;}
-  .btn-salir{width:100%; margin-top:20px; background:transparent; border:1.5px solid var(--rojo); color:var(--rojo); font-weight:600; font-size:13px; padding:12px; border-radius:8px;}
+  .settings-item{display:flex; justify-content:space-between; align-items:center; background:var(--md-surface-container); border-radius:18px; padding:15px 16px; margin-bottom:8px;}
+  .settings-item-label{font-size:14px; font-weight:600; color:var(--md-on-surface);}
+  .settings-item-sub{font-size:11px; color:var(--md-on-surface-variant); margin-top:2px;}
+  .btn-logout{width:100%; margin-top:12px; background:var(--md-error-container); color:var(--md-on-error-container); border:none; font-weight:700; font-size:13.5px; padding:15px; border-radius:100px;}
 
-  /* ---------- NAV INFERIOR ---------- */
-  .navbar{position:fixed; bottom:0; left:0; right:0; background:var(--fondo); border-top:1px solid rgba(128,128,128,0.15); display:flex; padding:8px 6px calc(10px + env(safe-area-inset-bottom)); z-index:21;}
-  .navitem{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 0; cursor:pointer; border:none; background:none;}
-  .navicon{width:20px; height:20px; opacity:0.5; transition:opacity 0.15s;}
-  .navitem.active .navicon{opacity:1;}
-  .navicon-wrap{width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:background 0.15s;}
-  .navitem.active .navicon-wrap{background:rgba(217,179,74,0.18);}
-  .navlabel{font-size:9px; color:var(--texto-app-suave); font-weight:600;}
-  .navitem.active .navlabel{color:var(--ambar);}
+  /* ---------- NAV INFERIOR M3 ---------- */
+  .navbar{position:fixed; bottom:0; left:0; right:0; background:var(--md-surface-container); display:flex; padding:10px 8px calc(8px + env(safe-area-inset-bottom)); z-index:21; border-top:1px solid var(--md-outline-variant);}
+  .navitem{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 0; border:none; background:none;}
+  .navicon-pill{width:52px; height:30px; border-radius:16px; display:flex; align-items:center; justify-content:center; transition:background 0.2s;}
+  .navitem.active .navicon-pill{background:var(--md-secondary-container);}
+  .navicon{width:22px; height:22px; opacity:0.75; color:var(--md-on-surface-variant);}
+  .navitem.active .navicon{opacity:1; color:var(--md-on-secondary-container);}
+  .navlabel{font-size:11px; color:var(--md-on-surface-variant); font-weight:600;}
+  .navitem.active .navlabel{color:var(--md-on-surface); font-weight:700;}
 </style>
 </head>
 <body>
@@ -202,23 +235,44 @@
 
 <div id="app">
   <div class="topbar">
-    <div class="wordmark">Ga<span>stos</span></div>
-    <span class="version-tag" id="version-tag"></span>
+    <div class="topbar-title">Gastos</div>
+    <div class="topbar-month" id="topbar-month">—</div>
   </div>
 
   <!-- RESUMEN -->
   <div class="view active" id="view-resumen">
     <div class="screen">
-      <div class="chart-wrap-hero" id="chart-wrap-hero">
-        <svg class="cat-line-svg" id="cat-lines"></svg>
-        <div class="chart-canvas-holder"><canvas id="chart-categorias"></canvas></div>
-        <div class="chart-center">
-          <div class="chart-center-ingresos" id="center-ingresos">0,00 €</div>
-          <div class="chart-center-gastos" id="center-gastos">0,00 €</div>
+      <div class="balance-card">
+        <div class="balance-row">
+          <div class="balance-col">
+            <div class="balance-label">Ingresos</div>
+            <div class="balance-amt ingreso" id="r-ingresos">0,00 €</div>
+          </div>
+          <div class="balance-col" style="text-align:right;">
+            <div class="balance-label">Gastos</div>
+            <div class="balance-amt gasto" id="r-gastos">0,00 €</div>
+          </div>
+        </div>
+        <div class="balance-ahorro">
+          <div class="balance-ahorro-label">Ahorro del mes</div>
+          <div class="balance-ahorro-amt" id="r-ahorro">0,00 €</div>
         </div>
       </div>
-      <div class="spinner" id="capture-spinner">Leyendo ticket con IA…</div>
-      <div class="recent-label">Movimientos <span style="font-weight:400; text-transform:none; letter-spacing:0;">(toca uno para corregirlo)</span></div>
+
+      <div class="m3-card chart-card">
+        <div class="chart-mini">
+          <canvas id="chart-categorias"></canvas>
+          <div class="chart-mini-total">
+            <div class="chart-mini-total-label">Total</div>
+            <div class="chart-mini-total-amt" id="chart-total-mini">0 €</div>
+          </div>
+        </div>
+        <div class="legend-list" id="legend-list"></div>
+      </div>
+
+      <div class="spinner" id="capture-spinner"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span> Leyendo ticket con IA…</div>
+
+      <div class="section-title">Movimientos recientes</div>
       <div id="movimientos-list"></div>
     </div>
   </div>
@@ -226,83 +280,74 @@
   <!-- TICKETS -->
   <div class="view" id="view-tickets">
     <div class="screen">
-      <div class="recent-label" style="margin-top:14px;">Compras (súper y online)</div>
+      <div class="section-title" style="margin-top:6px;">Gasto por etiqueta</div>
       <div class="chip-row" id="tickets-chips"></div>
+      <div class="section-title">Todos los tickets</div>
       <div id="tickets-detalle"></div>
     </div>
   </div>
 
-  <!-- FIJOS -->
-  <div class="view" id="view-fijos">
+  <!-- AJUSTES -->
+  <div class="view" id="view-ajustes">
     <div class="screen">
-      <div class="config-section-title">Nómina de este mes</div>
-      <div class="nomina-card">
-        <input type="number" id="nomina-importe" placeholder="Importe €" step="0.01">
-        <button id="nomina-guardar">Guardar</button>
+      <div class="section-title">Nómina de este mes</div>
+      <div class="m3-card">
+        <div class="nomina-row">
+          <input type="number" id="nomina-importe" placeholder="Importe €" step="0.01">
+          <button id="nomina-guardar">Guardar</button>
+        </div>
+        <div class="hint-text" id="nomina-hint"></div>
       </div>
-      <div class="nomina-hint" id="nomina-hint"></div>
 
-      <div class="config-section-title">Gastos fijos</div>
+      <div class="section-title">Gastos fijos</div>
       <div id="fijos-list"></div>
-      <div class="add-fijo">
+      <div class="add-form">
         <input type="text" id="new-fijo-nombre" placeholder="Nombre (ej. Alquiler)">
         <select id="new-fijo-categoria"></select>
-        <select id="new-fijo-subcategoria"></select>
-        <div style="display:flex; gap:8px;">
+        <div style="display:flex; gap:9px;">
           <input type="number" id="new-fijo-importe" placeholder="Importe €" step="0.01" style="flex:1;">
-          <input type="number" id="new-fijo-dia" placeholder="Día" min="1" max="31" style="width:80px;">
+          <input type="number" id="new-fijo-dia" placeholder="Día" min="1" max="31" style="width:82px;">
         </div>
         <label class="check-inline"><input type="checkbox" id="new-fijo-variable"> El importe varía cada mes</label>
         <button id="add-fijo-btn">Añadir gasto fijo</button>
       </div>
-    </div>
-  </div>
 
-  <!-- OPCIONES -->
-  <div class="view" id="view-opciones">
-    <div class="screen">
-      <div class="config-section-title">Apariencia</div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-row-label">Modo claro</div>
-          <div class="toggle-row-sub">Cambia los colores de la app</div>
-        </div>
-        <button class="cat-toggle off" id="tema-toggle"></button>
+      <div class="section-title">Categorías</div>
+      <div id="cat-list"></div>
+      <div class="add-form">
+        <input type="text" id="nueva-cat-nombre" placeholder="Nueva categoría…">
+        <button id="add-cat-btn">Añadir categoría</button>
       </div>
 
-      <div class="config-section-title">Categorías</div>
-      <div id="config-cat-list"></div>
+      <div class="section-title">Apariencia</div>
+      <div class="settings-item">
+        <div>
+          <div class="settings-item-label">Modo claro</div>
+          <div class="settings-item-sub">Cambia los colores de la app</div>
+        </div>
+        <button class="m3-switch off" id="tema-toggle"></button>
+      </div>
 
-      <button class="btn-salir" id="logout-btn">Cerrar sesión</button>
+      <div class="section-title">Cuenta</div>
+      <button class="btn-logout" id="logout-btn">Cerrar sesión</button>
+      <div class="hint-text" id="version-tag" style="text-align:center; margin-top:14px;"></div>
     </div>
   </div>
 
-  <div class="actionbar">
-    <div class="action-circle action-minus" id="btn-manual">－</div>
-    <div class="action-circle action-camera" id="btn-camara">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2.2h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.6"/></svg>
-    </div>
-    <div class="action-circle action-gallery" id="btn-galeria">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M20.5 15l-5-5-9 9"/></svg>
-    </div>
-  </div>
+  <button class="fab" id="fab-add">＋</button>
 
   <div class="navbar">
     <button class="navitem active" data-view="resumen">
-      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 8 8h-8z"/></svg></div>
+      <div class="navicon-pill"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 8 8h-8z"/></svg></div>
       <div class="navlabel">Resumen</div>
     </button>
     <button class="navitem" data-view="tickets">
-      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h6M9 15h6"/></svg></div>
+      <div class="navicon-pill"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h6M9 15h6"/></svg></div>
       <div class="navlabel">Tickets</div>
     </button>
-    <button class="navitem" data-view="fijos">
-      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h13l3 3v13H4z"/><path d="M8 4v4h8V4"/></svg></div>
-      <div class="navlabel">Fijos</div>
-    </button>
-    <button class="navitem" data-view="opciones">
-      <div class="navicon-wrap"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
-      <div class="navlabel">Opciones</div>
+    <button class="navitem" data-view="ajustes">
+      <div class="navicon-pill"><svg class="navicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+      <div class="navlabel">Ajustes</div>
     </button>
   </div>
 
@@ -310,22 +355,41 @@
   <input type="file" id="file-input-gallery" accept="image/*">
 </div>
 
+<!-- BOTTOM SHEET: añadir -->
+<div class="sheet-overlay" id="sheet-add">
+  <div class="sheet-box">
+    <div class="sheet-handle"></div>
+    <div class="sheet-option" id="sheet-camara">
+      <div class="sheet-option-icon">📷</div>
+      <div class="sheet-option-text">Escanear ticket</div>
+    </div>
+    <div class="sheet-option" id="sheet-galeria">
+      <div class="sheet-option-icon">🖼️</div>
+      <div class="sheet-option-text">Elegir de la galería</div>
+    </div>
+    <div class="sheet-option" id="sheet-manual">
+      <div class="sheet-option-icon">✏️</div>
+      <div class="sheet-option-text">Gasto manual</div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-revisar"><div class="modal-box" id="modal-revisar-box"></div></div>
 
 <div class="modal-overlay" id="modal-manual">
   <div class="modal-box">
-    <div class="modal-title">Gasto imprevisto</div>
+    <div class="modal-title">Gasto <span id="manual-modal-tipo">imprevisto</span></div>
     <input type="text" id="manual-descripcion" placeholder="¿Qué has pagado?">
     <div class="modal-row">
       <input type="number" id="manual-importe" placeholder="Importe €" step="0.01">
       <input type="date" id="manual-fecha">
     </div>
     <select id="manual-categoria"></select>
-    <select id="manual-subcategoria"></select>
     <div class="modal-actions">
-      <button class="btn-secundario" id="manual-cancelar">Cancelar</button>
-      <button class="btn-primario" id="manual-guardar">Guardar</button>
+      <button class="btn-tonal" id="manual-cancelar">Cancelar</button>
+      <button class="btn-filled" id="manual-guardar">Guardar</button>
     </div>
+    <button class="btn-danger-text" id="manual-borrar" style="display:none;">Borrar este gasto</button>
   </div>
 </div>
 
@@ -334,20 +398,18 @@
     <div class="modal-title">Gasto fijo</div>
     <input type="text" id="fijo-nombre" placeholder="Nombre">
     <select id="fijo-categoria"></select>
-    <select id="fijo-subcategoria"></select>
     <div class="modal-row">
       <input type="number" id="fijo-importe" placeholder="Importe €" step="0.01">
       <input type="number" id="fijo-dia" placeholder="Día" min="1" max="31">
     </div>
     <label class="modal-check"><input type="checkbox" id="fijo-variable"> El importe varía cada mes (luz, agua...)</label>
     <div class="modal-actions">
-      <button class="btn-secundario" id="fijo-cancelar">Cancelar</button>
-      <button class="btn-primario" id="fijo-guardar">Guardar</button>
+      <button class="btn-tonal" id="fijo-cancelar">Cancelar</button>
+      <button class="btn-filled" id="fijo-guardar">Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- MODAL: detalle de una categoría del círculo -->
 <div class="modal-overlay" id="modal-categoria-detalle">
   <div class="modal-box">
     <div class="modal-title"><span id="modal-cat-titulo">Categoría</span><button class="modal-close-x" id="cerrar-modal-cat">✕</button></div>
@@ -356,7 +418,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=3.3.2"></script>
-<script src="./app.js?v=3.3.2"></script>
+<script src="./config.js?v=4.0.0"></script>
+<script src="./app.js?v=4.0.0"></script>
 </body>
 </html>

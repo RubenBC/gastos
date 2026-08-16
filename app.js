@@ -1,85 +1,48 @@
 // ============================================================
-// GASTOS — app.js (v3: 4 pestañas + subcategorías con tono + tema)
+// GASTOS — app.js (v4: Material You, categorías planas)
 // ============================================================
 
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
-const PALETTE_COLORS = {
-  'hogar': '#a75d35', 'alimentación': '#d9b34a', 'transporte y moto': '#8f7a3d',
-  'préstamos': '#6f4c3e', 'salud': '#5c3a2e', 'ocio': '#c9a769',
-  'compras': '#b98b56', 'otros': '#e5c9a9',
+const CAT_COLORS = {
+  'alimentación': '#96C36E', 'higiene personal': '#7FB8B0', 'limpieza': '#7FA8D9',
+  'vivienda': '#D98F6F', 'transporte': '#C7A96B', 'salud': '#D98A9E',
+  'ocio': '#B08FD9', 'compras': '#C79A5C', 'otros': '#9C9585',
 };
-const PALETTE_ICONS = {
-  'hogar': '🏠', 'alimentación': '🛒', 'transporte y moto': '🚗',
-  'préstamos': '💳', 'salud': '❤️', 'ocio': '🎉',
-  'compras': '🛍️', 'otros': '❓',
+const CAT_ICONOS = {
+  'alimentación': '🛒', 'higiene personal': '🧴', 'limpieza': '🧽',
+  'vivienda': '🏠', 'transporte': '🚗', 'salud': '❤️',
+  'ocio': '🎉', 'compras': '🛍️', 'otros': '❓',
 };
-function iconoPadre(nombre) { return PALETTE_ICONS[(nombre || '').toLowerCase()] || '❓'; }
-function colorPadre(nombre) { return PALETTE_COLORS[(nombre || '').toLowerCase()] || '#8a8175'; }
+const PALETA_RESPALDO = ['#96C36E', '#7FB8B0', '#7FA8D9', '#D98F6F', '#C7A96B', '#D98A9E', '#B08FD9', '#C79A5C', '#9C9585'];
+
+function colorCategoria(nombre) {
+  const k = (nombre || '').toLowerCase();
+  if (CAT_COLORS[k]) return CAT_COLORS[k];
+  let hash = 0;
+  for (let i = 0; i < k.length; i++) hash = k.charCodeAt(i) + ((hash << 5) - hash);
+  return PALETA_RESPALDO[Math.abs(hash) % PALETA_RESPALDO.length];
+}
+function iconoCategoria(nombre) {
+  const k = (nombre || '').toLowerCase();
+  return CAT_ICONOS[k] || '🏷️';
+}
 function euros(n) { return (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
 function fechaLocal(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 function ultimoDiaMes(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function hoyISO() { const d = new Date(); return fechaLocal(d.getFullYear(), d.getMonth(), d.getDate()); }
-
-function ajustarColor(hex, percent) {
-  const num = parseInt(hex.replace('#', ''), 16);
-  let r = (num >> 16) & 0xFF, g = (num >> 8) & 0xFF, b = num & 0xFF;
-  const adj = (c) => Math.min(255, Math.max(0, Math.round(c + 255 * percent / 100)));
-  return '#' + [adj(r), adj(g), adj(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
-}
+function nombreCategoria(id) { return categoriasCache.find((c) => c.id === id)?.nombre || 'Otros'; }
 
 let categoriasCache = [];
 let ticketActual = null;
 let modalManualEditId = null;
 let nominaEsteMesId = null;
 let chartCategorias = null;
-let filtroTicketsActivo = null;
 
-// ---------------- CATEGORÍAS Y COLORES ----------------
-function padres() { return categoriasCache.filter((c) => !c.padre_id); }
-function hijasDe(padreId) { return categoriasCache.filter((c) => c.padre_id === padreId).sort((a, b) => a.orden - b.orden); }
-function padreDeCategoria(catId) {
-  const cat = categoriasCache.find((c) => c.id === catId);
-  if (!cat) return 'Otros';
-  if (!cat.padre_id) return cat.nombre;
-  return categoriasCache.find((c) => c.id === cat.padre_id)?.nombre || 'Otros';
-}
-function nombreCompleto(catId) {
-  const cat = categoriasCache.find((c) => c.id === catId);
-  if (!cat) return '';
-  if (!cat.padre_id) return cat.nombre;
-  const p = categoriasCache.find((c) => c.id === cat.padre_id);
-  return p ? `${p.nombre} · ${cat.nombre}` : cat.nombre;
-}
-function colorDeCategoria(catId) {
-  const cat = categoriasCache.find((c) => c.id === catId);
-  if (!cat) return '#8a8175';
-  if (!cat.padre_id) return colorPadre(cat.nombre);
-  const padre = categoriasCache.find((c) => c.id === cat.padre_id);
-  const base = colorPadre(padre?.nombre);
-  const hermanas = hijasDe(cat.padre_id);
-  const i = hermanas.findIndex((h) => h.id === cat.id);
-  if (i <= 0) return base;
-  const nivel = Math.ceil(i / 2) * 14;
-  return ajustarColor(base, i % 2 === 1 ? nivel : -nivel);
-}
-
-function poblarCascada(selPadre, selHija, categoriaIdActual) {
-  const listaPadres = padres().filter((p) => p.activa);
-  selPadre.innerHTML = listaPadres.map((p) => `<option value="${p.id}">${iconoPadre(p.nombre)} ${p.nombre}</option>`).join('');
-  let padreIdInicial = listaPadres[0]?.id;
-  if (categoriaIdActual) {
-    const catActual = categoriasCache.find((c) => c.id === categoriaIdActual);
-    if (catActual) padreIdInicial = catActual.padre_id || catActual.id;
-  }
-  selPadre.value = padreIdInicial;
-  function refrescarHijas() {
-    const hijas = hijasDe(selPadre.value).filter((h) => h.activa);
-    selHija.innerHTML = hijas.map((h) => `<option value="${h.id}">${h.nombre}</option>`).join('');
-    if (categoriaIdActual && hijas.some((h) => h.id === categoriaIdActual)) selHija.value = categoriaIdActual;
-  }
-  selPadre.onchange = refrescarHijas;
-  refrescarHijas();
+function poblarSelectCategorias(sel, categoriaIdActual) {
+  const activas = categoriasCache.filter((c) => c.activa);
+  sel.innerHTML = activas.map((c) => `<option value="${c.id}" ${c.id === categoriaIdActual ? 'selected' : ''}>${iconoCategoria(c.nombre)} ${c.nombre}</option>`).join('');
+  if (!categoriaIdActual && activas.length) sel.value = activas[0].id;
 }
 
 // ---------------- AUTH ----------------
@@ -113,6 +76,7 @@ async function mostrarApp() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('version-tag').textContent = 'v' + CONFIG.APP_VERSION;
   document.getElementById('manual-fecha').value = hoyISO();
+  document.getElementById('topbar-month').textContent = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
   if (localStorage.getItem('gastos-tema') === 'claro') {
     document.body.classList.add('tema-claro');
@@ -123,29 +87,23 @@ async function mostrarApp() {
   await cargarDashboard();
 }
 
-// ---------------- TEMA ----------------
 document.getElementById('tema-toggle').addEventListener('click', () => {
   const claro = document.body.classList.toggle('tema-claro');
   document.getElementById('tema-toggle').classList.toggle('off', !claro);
   localStorage.setItem('gastos-tema', claro ? 'claro' : 'oscuro');
-  dibujarDashboardSiVisible();
-});
-function dibujarDashboardSiVisible() {
   if (document.getElementById('view-resumen').classList.contains('active')) cargarDashboard();
-}
+});
 
-// ---------------- NAVEGACIÓN (4 pestañas) ----------------
+// ---------------- NAVEGACIÓN ----------------
 document.querySelectorAll('.navitem').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.navitem').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
-
     if (btn.dataset.view === 'resumen') cargarDashboard();
     if (btn.dataset.view === 'tickets') cargarTickets();
-    if (btn.dataset.view === 'fijos') { cargarNominaConfig(); cargarFijosConfig(); }
-    if (btn.dataset.view === 'opciones') renderConfigCategorias();
+    if (btn.dataset.view === 'ajustes') { cargarNominaConfig(); cargarFijosConfig(); renderCategorias(); }
   });
 });
 
@@ -155,6 +113,36 @@ async function cargarCategorias() {
   if (error) { alert('No se pudieron cargar las categorías: ' + error.message); return; }
   categoriasCache = data;
 }
+
+function renderCategorias() {
+  const cont = document.getElementById('cat-list');
+  cont.innerHTML = categoriasCache.map((c) => `
+    <div class="cat-row">
+      <div class="cat-row-left">
+        <div class="cat-icon-circ" style="background:${colorCategoria(c.nombre)}33; color:${colorCategoria(c.nombre)};">${iconoCategoria(c.nombre)}</div>
+        <div class="cat-name">${c.nombre}</div>
+      </div>
+      <button class="m3-switch ${c.activa ? '' : 'off'}" data-id="${c.id}" data-activa="${c.activa}"></button>
+    </div>
+  `).join('');
+  cont.querySelectorAll('.m3-switch').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      await sb.from('categorias').update({ activa: btn.dataset.activa !== 'true' }).eq('id', btn.dataset.id);
+      await cargarCategorias();
+      renderCategorias();
+    });
+  });
+}
+
+document.getElementById('add-cat-btn').addEventListener('click', async () => {
+  const input = document.getElementById('nueva-cat-nombre');
+  const nombre = input.value.trim();
+  if (!nombre) return;
+  await sb.from('categorias').insert({ nombre, orden: categoriasCache.length + 1 });
+  input.value = '';
+  await cargarCategorias();
+  renderCategorias();
+});
 
 // ---------------- NÓMINA ----------------
 async function cargarNominaConfig() {
@@ -186,7 +174,6 @@ document.getElementById('nomina-guardar').addEventListener('click', async () => 
     const { data, error } = await sb.from('ingresos').insert({ fecha: hoyISO(), importe, descripcion: 'Nómina' }).select().single();
     if (!error) nominaEsteMesId = data.id;
   }
-  alert('Nómina guardada.');
   cargarDashboard();
 });
 
@@ -209,11 +196,11 @@ async function cargarFijosConfig() {
     else if (diaHoy > f.dia_cobro) { badgeClass = 'badge-confirmar'; badgeText = 'Confirmar importe'; }
 
     return `
-      <div class="fijo-card">
+      <div class="m3-card">
         <div class="fijo-top" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}" data-variable="${!f.importe_es_fijo}">
           <div>
-            <div class="fijo-name">${f.nombre} <span style="font-size:10px; color:var(--tinta-suave);">✎</span></div>
-            <div class="fijo-cat"><span class="fijo-cat-dot" style="background:${colorDeCategoria(f.categoria_id)}"></span>${nombreCompleto(f.categoria_id)} · día ${f.dia_cobro}</div>
+            <div class="fijo-name">${f.nombre} <span style="font-size:10px; opacity:0.6;">✎</span></div>
+            <div class="fijo-cat">${iconoCategoria(nombreCategoria(f.categoria_id))} ${nombreCategoria(f.categoria_id)} · día ${f.dia_cobro}</div>
           </div>
           <div class="fijo-amt">${f.importe_es_fijo ? euros(f.importe_estimado) : '~' + euros(f.importe_estimado)}${f.importe_es_fijo ? '' : '<span class="approx">estimado</span>'}</div>
         </div>
@@ -229,7 +216,7 @@ async function cargarFijosConfig() {
   cont.querySelectorAll('.fijo-badge:not([disabled])').forEach((btn) => btn.addEventListener('click', () => marcarFijoPagado(btn)));
   cont.querySelectorAll('.cal-chip').forEach((btn) => btn.addEventListener('click', () => abrirCalendario(btn.dataset.nombre, parseInt(btn.dataset.dia))));
 
-  poblarCascada(document.getElementById('new-fijo-categoria'), document.getElementById('new-fijo-subcategoria'));
+  poblarSelectCategorias(document.getElementById('new-fijo-categoria'));
 }
 
 async function marcarFijoPagado(btn) {
@@ -258,7 +245,7 @@ function abrirCalendario(nombre, dia) {
 
 document.getElementById('add-fijo-btn').addEventListener('click', async () => {
   const nombre = document.getElementById('new-fijo-nombre').value.trim();
-  const categoriaId = document.getElementById('new-fijo-subcategoria').value;
+  const categoriaId = document.getElementById('new-fijo-categoria').value;
   const importe = parseFloat(document.getElementById('new-fijo-importe').value);
   const dia = parseInt(document.getElementById('new-fijo-dia').value);
   const esVariable = document.getElementById('new-fijo-variable').checked;
@@ -280,7 +267,7 @@ function abrirModalFijo(el) {
   document.getElementById('fijo-importe').value = importe;
   document.getElementById('fijo-dia').value = dia;
   document.getElementById('fijo-variable').checked = variable === 'true';
-  poblarCascada(document.getElementById('fijo-categoria'), document.getElementById('fijo-subcategoria'), categoriaId);
+  poblarSelectCategorias(document.getElementById('fijo-categoria'), categoriaId);
   document.getElementById('modal-fijo').dataset.fijoId = fijoId;
   document.getElementById('modal-fijo').classList.add('open');
 }
@@ -290,7 +277,7 @@ document.getElementById('modal-fijo').addEventListener('click', (e) => { if (e.t
 document.getElementById('fijo-guardar').addEventListener('click', async () => {
   const fijoId = document.getElementById('modal-fijo').dataset.fijoId;
   const nombre = document.getElementById('fijo-nombre').value.trim();
-  const categoriaId = document.getElementById('fijo-subcategoria').value;
+  const categoriaId = document.getElementById('fijo-categoria').value;
   const importe = parseFloat(document.getElementById('fijo-importe').value);
   const dia = parseInt(document.getElementById('fijo-dia').value);
   const variable = document.getElementById('fijo-variable').checked;
@@ -305,60 +292,13 @@ document.getElementById('fijo-guardar').addEventListener('click', async () => {
   cargarFijosConfig();
 });
 
-// ---------------- CATEGORÍAS (en Opciones) ----------------
-function renderConfigCategorias() {
-  const cont = document.getElementById('config-cat-list');
-  cont.innerHTML = padres().map((p) => {
-    const hijas = hijasDe(p.id);
-    return `
-      <div class="cat-padre-row" data-id="${p.id}">
-        <div class="cat-padre-left">
-          <div class="cat-padre-icon" style="background:${colorPadre(p.nombre)}">${iconoPadre(p.nombre)}</div>
-          <div class="cat-padre-name">${p.nombre}</div>
-        </div>
-        <span class="chevron">▾</span>
-      </div>
-      <div class="cat-hijas">
-        ${hijas.map((h) => `
-          <div class="cat-hija-row">
-            <div class="cat-hija-left"><span class="cat-hija-dot" style="background:${colorDeCategoria(h.id)}"></span>${h.nombre}</div>
-            <button class="cat-toggle ${h.activa ? '' : 'off'}" data-id="${h.id}" data-activa="${h.activa}"></button>
-          </div>
-        `).join('')}
-        <div class="add-subcat">
-          <input type="text" placeholder="Nueva subcategoría…" class="new-subcat-input" data-padre-id="${p.id}">
-          <button class="new-subcat-btn" data-padre-id="${p.id}">+</button>
-        </div>
-      </div>
-    `;
-  }).join('');
+// ---------------- BOTTOM SHEET (＋) ----------------
+document.getElementById('fab-add').addEventListener('click', () => document.getElementById('sheet-add').classList.add('open'));
+document.getElementById('sheet-add').addEventListener('click', (e) => { if (e.target.id === 'sheet-add') e.currentTarget.classList.remove('open'); });
+document.getElementById('sheet-camara').addEventListener('click', () => { document.getElementById('sheet-add').classList.remove('open'); document.getElementById('file-input').click(); });
+document.getElementById('sheet-galeria').addEventListener('click', () => { document.getElementById('sheet-add').classList.remove('open'); document.getElementById('file-input-gallery').click(); });
+document.getElementById('sheet-manual').addEventListener('click', () => { document.getElementById('sheet-add').classList.remove('open'); abrirModalManual(); });
 
-  cont.querySelectorAll('.cat-padre-row').forEach((row) => row.addEventListener('click', () => row.classList.toggle('open')));
-  cont.querySelectorAll('.cat-toggle').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await sb.from('categorias').update({ activa: btn.dataset.activa !== 'true' }).eq('id', btn.dataset.id);
-      await cargarCategorias();
-      renderConfigCategorias();
-    });
-  });
-  cont.querySelectorAll('.new-subcat-btn').forEach((btn) => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const input = cont.querySelector(`.new-subcat-input[data-padre-id="${btn.dataset.padreId}"]`);
-      const nombre = input.value.trim();
-      if (!nombre) return;
-      await sb.from('categorias').insert({ nombre, padre_id: btn.dataset.padreId, orden: 99 });
-      input.value = '';
-      await cargarCategorias();
-      renderConfigCategorias();
-    });
-  });
-}
-
-// ---------------- CAPTURA (cámara / galería, siempre visible) ----------------
-document.getElementById('btn-camara').addEventListener('click', () => document.getElementById('file-input').click());
-document.getElementById('btn-galeria').addEventListener('click', () => document.getElementById('file-input-gallery').click());
 document.getElementById('file-input').addEventListener('change', (e) => procesarFotoTicket(e));
 document.getElementById('file-input-gallery').addEventListener('change', (e) => procesarFotoTicket(e));
 
@@ -401,18 +341,17 @@ function renderRevisarModal() {
   const box = document.getElementById('modal-revisar-box');
   box.innerHTML = `
     <div class="modal-title">Revisar ticket</div>
-    <div class="ticket">
-      <div class="comercio" contenteditable="true" id="edit-comercio">${ticket.comercio}</div>
-      <div class="meta">${ticket.fecha}</div>
+    <div class="ticket-preview">
+      <input class="comercio-edit" id="edit-comercio" value="${ticket.comercio}">
+      <div class="meta-edit">${ticket.fecha}</div>
       <hr class="divider">
       <div id="items-list">
         ${items.map((item) => `
-          <div class="item" data-item-id="${item.id}">
-            <div class="item-name" contenteditable="true" data-field="nombre_articulo">${item.nombre_articulo}</div>
+          <div class="item-edit" data-item-id="${item.id}">
+            <div class="item-name-edit" contenteditable="true" data-field="nombre_articulo">${item.nombre_articulo}</div>
             <div class="item-row2">
-              <select class="item-padre"></select>
-              <select class="item-hija" data-field="categoria_id"></select>
-              <div class="item-price" contenteditable="true" data-field="precio_total">${Number(item.precio_total).toFixed(2)}</div>
+              <select class="item-categoria" data-field="categoria_id"></select>
+              <div class="item-price-edit" contenteditable="true" data-field="precio_total">${Number(item.precio_total).toFixed(2)}</div>
             </div>
           </div>
         `).join('')}
@@ -423,14 +362,14 @@ function renderRevisarModal() {
       </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-secundario" id="btn-descartar">Descartar</button>
-      <button class="btn-primario" id="btn-conformar">Conformar</button>
+      <button class="btn-tonal" id="btn-descartar">Descartar</button>
+      <button class="btn-filled" id="btn-conformar">Conformar</button>
     </div>
   `;
 
-  box.querySelectorAll('.item').forEach((itemEl) => {
+  box.querySelectorAll('.item-edit').forEach((itemEl) => {
     const original = items.find((it) => it.id === itemEl.dataset.itemId);
-    poblarCascada(itemEl.querySelector('.item-padre'), itemEl.querySelector('.item-hija'), original?.categoria_id);
+    poblarSelectCategorias(itemEl.querySelector('.item-categoria'), original?.categoria_id);
   });
 
   box.querySelectorAll('[data-field="precio_total"]').forEach((el) => {
@@ -459,13 +398,13 @@ async function conformarTicket() {
   const { ticket } = ticketActual;
   const box = document.getElementById('modal-revisar-box');
 
-  const itemsEditados = [...box.querySelectorAll('#items-list .item')].map((row) => ({
+  const itemsEditados = [...box.querySelectorAll('#items-list .item-edit')].map((row) => ({
     id: row.dataset.itemId,
     nombre: row.querySelector('[data-field="nombre_articulo"]').textContent.trim(),
     precio: parseFloat(row.querySelector('[data-field="precio_total"]').textContent.replace(',', '.')) || 0,
     categoriaId: row.querySelector('[data-field="categoria_id"]').value,
   }));
-  const comercio = document.getElementById('edit-comercio').textContent.trim();
+  const comercio = document.getElementById('edit-comercio').value.trim();
   const totalFinal = itemsEditados.reduce((a, i) => a + i.precio, 0);
 
   if (itemsEditados.length === 0) {
@@ -496,16 +435,27 @@ async function conformarTicket() {
   }
 }
 
-// ---------------- GASTO MANUAL (－) ----------------
-document.getElementById('btn-manual').addEventListener('click', () => abrirModalManual());
+async function borrarTicketCompleto(ticketId) {
+  if (!confirm('¿Borrar este ticket entero? No se puede deshacer.')) return;
+  const { error: errorGastos } = await sb.from('gastos').delete().eq('ticket_id', ticketId);
+  if (errorGastos) { alert('No se pudo borrar: ' + errorGastos.message); return; }
+  const { error: errorTicket } = await sb.from('tickets').delete().eq('id', ticketId);
+  if (errorTicket) { alert('Se borraron los gastos pero no el ticket: ' + errorTicket.message); return; }
+  cargarDashboard();
+  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
+}
+
+// ---------------- GASTO MANUAL / OCASIONAL ----------------
 document.getElementById('manual-cancelar').addEventListener('click', () => document.getElementById('modal-manual').classList.remove('open'));
 
 function abrirModalManual(existing) {
   modalManualEditId = existing?.id || null;
+  document.getElementById('manual-modal-tipo').textContent = modalManualEditId ? '' : 'imprevisto';
   document.getElementById('manual-descripcion').value = existing?.descripcion || '';
   document.getElementById('manual-importe').value = existing?.importe || '';
   document.getElementById('manual-fecha').value = existing?.fecha || hoyISO();
-  poblarCascada(document.getElementById('manual-categoria'), document.getElementById('manual-subcategoria'), existing?.categoriaId);
+  document.getElementById('manual-borrar').style.display = modalManualEditId ? 'block' : 'none';
+  poblarSelectCategorias(document.getElementById('manual-categoria'), existing?.categoriaId);
   document.getElementById('modal-manual').classList.add('open');
 }
 
@@ -513,7 +463,7 @@ document.getElementById('manual-guardar').addEventListener('click', async () => 
   const descripcion = document.getElementById('manual-descripcion').value.trim();
   const importe = parseFloat(document.getElementById('manual-importe').value);
   const fecha = document.getElementById('manual-fecha').value;
-  const categoriaId = document.getElementById('manual-subcategoria').value;
+  const categoriaId = document.getElementById('manual-categoria').value;
   if (!descripcion || !importe || !fecha || !categoriaId) { alert('Rellena todos los campos.'); return; }
 
   let error;
@@ -529,25 +479,22 @@ document.getElementById('manual-guardar').addEventListener('click', async () => 
   if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
 });
 
+document.getElementById('manual-borrar').addEventListener('click', async () => {
+  if (!modalManualEditId) return;
+  if (!confirm('¿Borrar este gasto?')) return;
+  const { error } = await sb.from('gastos').delete().eq('id', modalManualEditId);
+  if (error) { alert('No se pudo borrar: ' + error.message); return; }
+  document.getElementById('modal-manual').classList.remove('open');
+  cargarDashboard();
+  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
+});
+
 function editarGasto(row) {
   const { gastoId, categoriaId, importe, descripcion, fecha } = row.dataset;
   abrirModalManual({ id: gastoId, categoriaId, importe, descripcion, fecha });
 }
 
-async function borrarTicketCompleto(ticketId) {
-  if (!confirm('¿Borrar este ticket entero? Se eliminarán todos sus artículos y no contarán como gasto. No se puede deshacer.')) return;
-
-  const { error: errorGastos } = await sb.from('gastos').delete().eq('ticket_id', ticketId);
-  if (errorGastos) { alert('No se pudo borrar: ' + errorGastos.message); return; }
-
-  const { error: errorTicket } = await sb.from('tickets').delete().eq('id', ticketId);
-  if (errorTicket) { alert('Se borraron los gastos pero no el ticket: ' + errorTicket.message); return; }
-
-  cargarDashboard();
-  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
-}
-
-// ---------------- RESUMEN (dashboard con círculo) ----------------
+// ---------------- RESUMEN (dashboard) ----------------
 async function cargarDashboard() {
   const hoy = new Date();
   const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
@@ -565,114 +512,72 @@ async function cargarDashboard() {
   (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
 
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
-  const porPadre = {};
+  const ahorro = totalIngresos - total;
+
+  document.getElementById('r-ingresos').textContent = euros(totalIngresos);
+  document.getElementById('r-gastos').textContent = euros(total);
+  document.getElementById('r-ahorro').textContent = euros(ahorro);
+  document.getElementById('r-ahorro').style.color = ahorro >= 0 ? 'var(--md-success)' : 'var(--md-error-container)';
+
+  const porCategoria = {};
   data.forEach((g) => {
-    const nombre = padreDeCategoria(g.categoria_id);
-    porPadre[nombre] = (porPadre[nombre] || 0) + Number(g.importe);
+    const nombre = nombreCategoria(g.categoria_id);
+    porCategoria[nombre] = (porCategoria[nombre] || 0) + Number(g.importe);
   });
 
-  window._gastosDelMes = data; // para el popup de categoría
-  dibujarDashboard(porPadre, total, totalIngresos);
-  renderMovimientos(data, comercioPorTicket);
+  dibujarDonut(porCategoria, total);
+  renderMovimientos(data, comercioPorTicket, 'movimientos-list', false);
 }
 
-function dibujarDashboard(porPadre, totalGastos, totalIngresos) {
-  document.getElementById('center-ingresos').textContent = euros(totalIngresos);
-  document.getElementById('center-gastos').textContent = euros(totalGastos);
-
-  const labels = Object.keys(porPadre);
-  const valores = Object.values(porPadre);
+function dibujarDonut(porCategoria, total) {
+  document.getElementById('chart-total-mini').textContent = total >= 1000 ? Math.round(total) + ' €' : euros(total);
+  const labels = Object.keys(porCategoria);
+  const valores = Object.values(porCategoria);
 
   try {
     const canvas = document.getElementById('chart-categorias');
     if (chartCategorias) { chartCategorias.destroy(); chartCategorias = null; }
-    const bordeChart = document.body.classList.contains('tema-claro') ? '#F3EEE3' : '#2B2622';
     if (labels.length) {
       chartCategorias = new Chart(canvas, {
         type: 'doughnut',
-        data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorPadre), borderColor: bordeChart, borderWidth: 3 }] },
-        options: {
-          cutout: '68%', rotation: -90,
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } },
-          },
-        },
+        data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorCategoria), borderWidth: 0 }] },
+        options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } } },
       });
     }
-    requestAnimationFrame(() => posicionarIconos(labels, valores));
   } catch (err) {
-    alert('La gráfica falló, pero los totales de arriba son correctos. Detalle técnico: ' + err.message);
+    console.error('Error dibujando la gráfica:', err);
   }
-}
 
-function posicionarIconos(labels, valores) {
-  try {
-    const wrap = document.getElementById('chart-wrap-hero');
-    wrap.querySelectorAll('.cat-label').forEach((el) => el.remove());
-    const svg = document.getElementById('cat-lines');
-    svg.innerHTML = '';
+  const legend = document.getElementById('legend-list');
+  const ordenado = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  legend.innerHTML = ordenado.map(([nombre, importe]) => `
+    <div class="legend-row" data-nombre="${nombre}">
+      <div class="legend-dot" style="background:${colorCategoria(nombre)}"></div>
+      <div class="legend-name">${iconoCategoria(nombre)} ${nombre}</div>
+      <div class="legend-amt">${euros(importe)}</div>
+    </div>
+  `).join('') || '<div class="empty-state" style="padding:0;">Sin gastos este mes.</div>';
 
-    const size = wrap.clientWidth;
-    if (!size || !labels.length) return;
-    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-
-    const cx = size / 2, cy = size / 2;
-    const donutR = size * 0.31, lineR = size * 0.44, iconR = size * 0.47;
-    const total = valores.reduce((a, b) => a + b, 0) || 1;
-    let acumulado = 0;
-
-    labels.forEach((nombre, i) => {
-      const frac = valores[i] / total;
-      const midFrac = acumulado + frac / 2;
-      acumulado += frac;
-      const angleRad = (-90 + midFrac * 360) * Math.PI / 180;
-      const color = colorPadre(nombre);
-
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', cx + donutR * Math.cos(angleRad));
-      line.setAttribute('y1', cy + donutR * Math.sin(angleRad));
-      line.setAttribute('x2', cx + lineR * Math.cos(angleRad));
-      line.setAttribute('y2', cy + lineR * Math.sin(angleRad));
-      line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', '1.5');
-      svg.appendChild(line);
-
-      const label = document.createElement('div');
-      label.className = 'cat-label';
-      label.style.left = (cx + iconR * Math.cos(angleRad)) + 'px';
-      label.style.top = (cy + iconR * Math.sin(angleRad)) + 'px';
-      label.innerHTML = `<div class="cat-label-icon" style="background:${color}">${iconoPadre(nombre)}</div><div class="cat-label-pct">${Math.round(frac * 100)}%</div>`;
-      label.addEventListener('click', () => abrirDetalleCategoria(nombre));
-      wrap.appendChild(label);
-    });
-  } catch (err) {
-    console.error('Error posicionando iconos:', err);
-  }
-}
-
-// ---------------- POPUP: detalle de una categoría del círculo ----------------
-function abrirDetalleCategoria(nombrePadre) {
-  const gastos = (window._gastosDelMes || []).filter((g) => padreDeCategoria(g.categoria_id) === nombrePadre);
-  const total = gastos.reduce((a, g) => a + Number(g.importe), 0);
-
-  const porSub = {};
-  gastos.forEach((g) => {
-    const nombreSub = nombreCompleto(g.categoria_id).split(' · ')[1] || nombreCompleto(g.categoria_id);
-    if (!porSub[nombreSub]) porSub[nombreSub] = [];
-    porSub[nombreSub].push(g);
+  legend.querySelectorAll('.legend-row').forEach((row) => {
+    row.addEventListener('click', () => abrirDetalleCategoria(row.dataset.nombre));
   });
+}
 
-  document.getElementById('modal-cat-titulo').textContent = `${iconoPadre(nombrePadre)} ${nombrePadre} — ${euros(total)}`;
-  document.getElementById('modal-cat-contenido').innerHTML = Object.entries(porSub).map(([sub, items]) => `
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--tinta-suave); margin-bottom:6px;">${sub} · ${euros(items.reduce((a, g) => a + Number(g.importe), 0))}</div>
-      ${items.map((g) => `
-        <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-          <span>${g.descripcion}</span>
-          <span>${euros(g.importe)}</span>
-        </div>
-      `).join('')}
+// ---------------- POPUP: detalle de una categoría ----------------
+async function abrirDetalleCategoria(nombreCat) {
+  const hoy = new Date();
+  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
+  const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), ultimoDiaMes(hoy.getFullYear(), hoy.getMonth()));
+  const catId = categoriasCache.find((c) => c.nombre === nombreCat)?.id;
+
+  const { data } = await sb.from('gastos').select('*').eq('categoria_id', catId).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
+  const total = (data || []).reduce((a, g) => a + Number(g.importe), 0);
+
+  document.getElementById('modal-cat-titulo').textContent = `${iconoCategoria(nombreCat)} ${nombreCat} — ${euros(total)}`;
+  document.getElementById('modal-cat-contenido').innerHTML = (data || []).map((g) => `
+    <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
+      <span>${g.descripcion}</span>
+      <span>${euros(g.importe)}</span>
     </div>
   `).join('') || '<div class="empty-state">Sin gastos en esta categoría.</div>';
 
@@ -684,165 +589,125 @@ function abrirDetalleCategoria(nombrePadre) {
 document.getElementById('cerrar-modal-cat').addEventListener('click', () => document.getElementById('modal-categoria-detalle').classList.remove('open'));
 document.getElementById('modal-categoria-detalle').addEventListener('click', (e) => { if (e.target.id === 'modal-categoria-detalle') e.currentTarget.classList.remove('open'); });
 
-// ---------------- MOVIMIENTOS (lista bajo el círculo) ----------------
-function renderMovimientos(data, comercioPorTicket) {
-  const tickets = [];
-  const otros = [];
+// ---------------- LISTA DE MOVIMIENTOS (compartida Resumen/Tickets) ----------------
+function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
+  const entradas = [];
   const gruposTicket = {};
   data.forEach((g) => {
     if (g.origen === 'ticket' && g.ticket_id) {
       if (!gruposTicket[g.ticket_id]) {
-        gruposTicket[g.ticket_id] = { ticketId: g.ticket_id, fecha: g.fecha, comercio: comercioPorTicket[g.ticket_id] || 'Ticket', total: 0, items: [] };
-        tickets.push(gruposTicket[g.ticket_id]);
+        gruposTicket[g.ticket_id] = { tipo: 'ticket', ticketId: g.ticket_id, fecha: g.fecha, comercio: comercioPorTicket[g.ticket_id] || 'Ticket', total: 0, items: [] };
+        entradas.push(gruposTicket[g.ticket_id]);
       }
       gruposTicket[g.ticket_id].total += Number(g.importe);
       gruposTicket[g.ticket_id].items.push(g);
-    } else {
-      otros.push(g);
+    } else if (g.origen === 'manual') {
+      entradas.push({ tipo: 'manual', fecha: g.fecha, gasto: g });
+    } else if (incluirFijos && g.origen === 'fijo') {
+      entradas.push({ tipo: 'fijo', fecha: g.fecha, gasto: g });
     }
   });
-  tickets.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
-  otros.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  entradas.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 
-  const htmlTickets = tickets.map((m) => `
-    <div class="ticket-group" data-ticket-id="${m.ticketId}">
-      <div class="ticket-group-header">
-        <div class="ticket-group-info">
-          <span class="chevron">▾</span>
-          <div>
-            <div class="ticket-group-name">${m.comercio}</div>
-            <div class="ticket-group-date">${new Date(m.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+  const cont = document.getElementById(containerId);
+  cont.innerHTML = entradas.map((e) => {
+    if (e.tipo === 'ticket') {
+      return `
+        <div class="ticket-card" data-ticket-id="${e.ticketId}">
+          <div class="ticket-card-header">
+            <div class="ticket-card-icon" style="background:${colorCategoria(e.items[0] ? nombreCategoria(e.items[0].categoria_id) : 'otros')}33;">🧾</div>
+            <div class="ticket-card-info">
+              <div class="ticket-card-name">${e.comercio}</div>
+              <div class="ticket-card-date">${new Date(e.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+            </div>
+            <div class="ticket-card-amt">${euros(e.total)}</div>
+            <span class="ticket-chevron">▾</span>
+            <button class="ticket-delete-btn" data-ticket-id="${e.ticketId}">🗑</button>
+          </div>
+          <div class="ticket-card-detail">
+            ${e.items.map((it) => `
+              <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${it.descripcion}" data-fecha="${it.fecha}">
+                <span>${iconoCategoria(nombreCategoria(it.categoria_id))} ${it.descripcion.split(' — ').slice(1).join(' — ') || it.descripcion}</span>
+                <span>${euros(it.importe)}</span>
+              </div>
+            `).join('')}
           </div>
         </div>
-        <div class="ticket-group-amt">${euros(m.total)}</div>
-        <button class="ticket-delete-btn" data-ticket-id="${m.ticketId}" title="Borrar ticket completo">🗑</button>
-      </div>
-      <div class="ticket-group-detail">
-        ${m.items.map((it) => `
-          <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${it.descripcion}" data-fecha="${it.fecha}">
-            <span><span class="cat-dot-inline" style="background:${colorDeCategoria(it.categoria_id)}"></span>${it.descripcion.split(' — ').slice(1).join(' — ') || it.descripcion}</span>
-            <span>${euros(it.importe)}</span>
+      `;
+    }
+    const g = e.gasto;
+    return `
+      <div class="ticket-card">
+        <div class="ticket-card-header" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}" style="cursor:pointer;">
+          <div class="ticket-card-icon" style="background:${colorCategoria(nombreCategoria(g.categoria_id))}33;">${iconoCategoria(nombreCategoria(g.categoria_id))}</div>
+          <div class="ticket-card-info">
+            <div class="ticket-card-name">${g.descripcion} ${e.tipo === 'manual' ? '<span class="manual-tag">· manual</span>' : ''}</div>
+            <div class="ticket-card-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
           </div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('') || '<div class="empty-state">Sin tickets este mes todavía.</div>';
-
-  const htmlOtros = otros.map((g) => `
-    <div class="gasto-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-      <div class="gasto-left">
-        <div class="gasto-dot" style="background:${colorDeCategoria(g.categoria_id)}"></div>
-        <div>
-          <div class="gasto-name">${g.descripcion}</div>
-          <div class="gasto-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
+          <div class="ticket-card-amt">${euros(g.importe)}</div>
         </div>
       </div>
-      <div class="gasto-amt">${euros(g.importe)}</div>
-    </div>
-  `).join('') || '<div class="empty-state">Sin gastos fijos registrados este mes.</div>';
+    `;
+  }).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>';
 
-  const cont = document.getElementById('movimientos-list');
-  cont.innerHTML = `
-    <div class="recent-label" style="margin-top:0;">Tickets</div>
-    ${htmlTickets}
-    <div class="recent-label">Gastos fijos</div>
-    ${htmlOtros}
-  `;
-
-  cont.querySelectorAll('.ticket-group-header').forEach((h) => h.addEventListener('click', () => h.closest('.ticket-group').classList.toggle('open')));
+  cont.querySelectorAll('.ticket-card-header').forEach((h) => {
+    h.addEventListener('click', (evt) => {
+      if (evt.target.classList.contains('ticket-delete-btn')) return;
+      if (h.closest('.ticket-card').dataset.ticketId) { h.closest('.ticket-card').classList.toggle('open'); return; }
+      editarGasto(h);
+    });
+  });
   cont.querySelectorAll('.ticket-delete-btn').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); borrarTicketCompleto(btn.dataset.ticketId); }));
   cont.querySelectorAll('.ticket-item-row').forEach((row) => row.addEventListener('click', (e) => { e.stopPropagation(); editarGasto(row); }));
-  cont.querySelectorAll('.gasto-row').forEach((row) => row.addEventListener('click', () => editarGasto(row)));
 }
 
-// ---------------- TICKETS (compras: súper + online) ----------------
-const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Compras online', 'Otros'];
-const PALABRAS_ONLINE = /amazon|aliexpress|ebay|shein|zalando|el corte inglés online|pccomponentes/i;
+// ---------------- TICKETS (pestaña) ----------------
+const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Otros'];
 
 async function cargarTickets() {
   const hoy = new Date();
   const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
   const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), ultimoDiaMes(hoy.getFullYear(), hoy.getMonth()));
 
-  const { data, error } = await sb.from('gastos').select('*').eq('origen', 'ticket').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
+  const { data, error } = await sb.from('gastos').select('*').in('origen', ['ticket', 'manual']).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
   if (error) { alert('No se pudieron cargar los tickets: ' + error.message); return; }
 
-  const { data: ticketsMes, error: errorTickets } = await sb.from('tickets').select('id, comercio, fecha, importe_total').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
+  const { data: ticketsMes, error: errorTickets } = await sb.from('tickets').select('id, comercio, fecha').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
   if (errorTickets) { alert('No se pudieron cargar los tickets: ' + errorTickets.message); return; }
-
-  const ticketPorId = {};
-  (ticketsMes || []).forEach((t) => { ticketPorId[t.id] = t; });
-
-  function etiquetaDe(g) {
-    const nombreSub = nombreCompleto(g.categoria_id).split(' · ')[1] || '';
-    if (nombreSub === 'Alimentos') return 'Alimentación';
-    if (nombreSub === 'Higiene personal') return 'Higiene personal';
-    if (nombreSub === 'Limpieza') return 'Limpieza';
-    const comercio = ticketPorId[g.ticket_id]?.comercio || '';
-    if (PALABRAS_ONLINE.test(comercio)) return 'Compras online';
-    return 'Otros';
-  }
+  const comercioPorTicket = {};
+  (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
 
   const porEtiqueta = {};
-  ETIQUETAS_TICKETS.forEach((e) => { porEtiqueta[e] = { items: [], total: 0 }; });
+  ETIQUETAS_TICKETS.forEach((e) => { porEtiqueta[e] = 0; });
   data.forEach((g) => {
-    const e = etiquetaDe(g);
-    porEtiqueta[e].items.push(g);
-    porEtiqueta[e].total += Number(g.importe);
+    const nombre = nombreCategoria(g.categoria_id);
+    const etiqueta = ETIQUETAS_TICKETS.includes(nombre) ? nombre : 'Otros';
+    porEtiqueta[etiqueta] += Number(g.importe);
   });
 
-  // Chips: solo informativos, tocarlos abre el desglose en popup
   const chips = document.getElementById('tickets-chips');
   chips.innerHTML = ETIQUETAS_TICKETS.map((e) => `
-    <div class="filtro-chip" data-etiqueta="${e}">${e} <span class="chip-amt">${euros(porEtiqueta[e].total)}</span></div>
+    <div class="m3-chip" data-etiqueta="${e}">${iconoCategoria(e)} ${e} <span class="chip-amt">${euros(porEtiqueta[e])}</span></div>
   `).join('');
-  chips.querySelectorAll('.filtro-chip').forEach((chip) => {
-    chip.addEventListener('click', () => abrirDetalleEtiquetaTickets(chip.dataset.etiqueta, porEtiqueta[chip.dataset.etiqueta]));
+  chips.querySelectorAll('.m3-chip').forEach((chip) => {
+    chip.addEventListener('click', () => abrirDetalleEtiquetaGeneral(chip.dataset.etiqueta, data));
   });
 
-  // Lista de TODOS los tickets del mes, desplegables
-  const detalle = document.getElementById('tickets-detalle');
-  detalle.innerHTML = `<div class="recent-label" style="margin-top:16px;">Todos los tickets de este mes</div>` + ((ticketsMes || []).map((t) => {
-    const items = data.filter((g) => g.ticket_id === t.id);
-    return `
-      <div class="ticket-group" data-ticket-id="${t.id}">
-        <div class="ticket-group-header">
-          <div class="ticket-group-info">
-            <span class="chevron">▾</span>
-            <div>
-              <div class="ticket-group-name">${t.comercio}</div>
-              <div class="ticket-group-date">${new Date(t.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
-            </div>
-          </div>
-          <div class="ticket-group-amt">${euros(t.importe_total)}</div>
-          <button class="ticket-delete-btn" data-ticket-id="${t.id}" title="Borrar ticket completo">🗑</button>
-        </div>
-        <div class="ticket-group-detail">
-          ${items.map((g) => `
-            <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-              <span><span class="cat-dot-inline" style="background:${colorDeCategoria(g.categoria_id)}"></span>${g.descripcion.split(' — ').slice(1).join(' — ') || g.descripcion}</span>
-              <span>${euros(g.importe)}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }).join('') || '<div class="empty-state">Todavía no has escaneado ningún ticket este mes.</div>');
-
-  detalle.querySelectorAll('.ticket-group-header').forEach((h) => h.addEventListener('click', () => h.closest('.ticket-group').classList.toggle('open')));
-  detalle.querySelectorAll('.ticket-delete-btn').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); borrarTicketCompleto(btn.dataset.ticketId); }));
-  detalle.querySelectorAll('.ticket-item-row').forEach((row) => row.addEventListener('click', (e) => { e.stopPropagation(); editarGasto(row); }));
+  renderMovimientos(data, comercioPorTicket, 'tickets-detalle', false);
 }
 
-function abrirDetalleEtiquetaTickets(nombreEtiqueta, grupo) {
-  document.getElementById('modal-cat-titulo').textContent = `${nombreEtiqueta} — ${euros(grupo.total)}`;
-  document.getElementById('modal-cat-contenido').innerHTML = grupo.items.map((g) => `
+function abrirDetalleEtiquetaGeneral(etiqueta, data) {
+  const items = data.filter((g) => {
+    const nombre = nombreCategoria(g.categoria_id);
+    return etiqueta === 'Otros' ? !ETIQUETAS_TICKETS.slice(0, 3).includes(nombre) : nombre === etiqueta;
+  });
+  const total = items.reduce((a, g) => a + Number(g.importe), 0);
+  document.getElementById('modal-cat-titulo').textContent = `${iconoCategoria(etiqueta)} ${etiqueta} — ${euros(total)}`;
+  document.getElementById('modal-cat-contenido').innerHTML = items.map((g) => `
     <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-      <span>${g.descripcion}</span>
-      <span>${euros(g.importe)}</span>
+      <span>${g.descripcion}</span><span>${euros(g.importe)}</span>
     </div>
   `).join('') || '<div class="empty-state">Nada en esta etiqueta todavía.</div>';
-
   document.getElementById('modal-cat-contenido').querySelectorAll('.ticket-item-row').forEach((row) => {
     row.addEventListener('click', () => { document.getElementById('modal-categoria-detalle').classList.remove('open'); editarGasto(row); });
   });
