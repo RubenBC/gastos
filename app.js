@@ -558,25 +558,57 @@ function dibujarDonut(porCategoria) {
       chartCategorias = new Chart(canvas, {
         type: 'doughnut',
         data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorCategoria), borderWidth: 0 }] },
-        options: { cutout: '68%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } } },
+        options: {
+          cutout: '68%', rotation: -90,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } },
+        },
       });
     }
   } catch (err) {
     console.error('Error dibujando la gráfica:', err);
   }
 
-  const legend = document.getElementById('legend-list');
-  const ordenado = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
-  legend.innerHTML = ordenado.map(([nombre, importe]) => `
-    <div class="legend-row" data-nombre="${nombre}">
-      <div class="legend-icon" style="background:${colorCategoria(nombre)}40; color:${colorCategoria(nombre)};">${iconoSVG(nombre, 16)}</div>
-      <div class="legend-name">${nombre}</div>
-      <div class="legend-amt">${euros(importe)}</div>
-    </div>
-  `).join('') || '<div class="empty-state" style="padding:0;">Sin gastos este mes.</div>';
+  requestAnimationFrame(() => posicionarIconosDonut(labels, valores));
+}
 
-  legend.querySelectorAll('.legend-row').forEach((row) => {
-    row.addEventListener('click', () => abrirDetalleCategoria(row.dataset.nombre));
+function posicionarIconosDonut(labels, valores) {
+  const wrap = document.getElementById('donut-hero');
+  wrap.querySelectorAll('.cat-icon-label').forEach((el) => el.remove());
+  const svg = document.getElementById('cat-lines');
+  svg.innerHTML = '';
+
+  const size = wrap.clientWidth;
+  if (!size || !labels.length) { svg.setAttribute('viewBox', '0 0 1 1'); return; }
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+
+  const cx = size / 2, cy = size / 2;
+  const donutR = size * 0.335, lineR = size * 0.43, iconR = size * 0.465;
+  const total = valores.reduce((a, b) => a + b, 0) || 1;
+  let acumulado = 0;
+
+  labels.forEach((nombre, i) => {
+    const frac = valores[i] / total;
+    const midFrac = acumulado + frac / 2;
+    acumulado += frac;
+    const angleRad = (-90 + midFrac * 360) * Math.PI / 180;
+    const color = colorCategoria(nombre);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', cx + donutR * Math.cos(angleRad));
+    line.setAttribute('y1', cy + donutR * Math.sin(angleRad));
+    line.setAttribute('x2', cx + lineR * Math.cos(angleRad));
+    line.setAttribute('y2', cy + lineR * Math.sin(angleRad));
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', '1.6');
+    svg.appendChild(line);
+
+    const label = document.createElement('div');
+    label.className = 'cat-icon-label';
+    label.style.left = (cx + iconR * Math.cos(angleRad)) + 'px';
+    label.style.top = (cy + iconR * Math.sin(angleRad)) + 'px';
+    label.innerHTML = `<div class="cat-icon-circ2" style="background:${color}40; color:${color};">${iconoSVG(nombre, 17)}</div>`;
+    label.addEventListener('click', () => abrirDetalleCategoria(nombre));
+    wrap.appendChild(label);
   });
 }
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.1.0">
+<link rel="manifest" href="./manifest.json?v=4.2.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -66,25 +66,23 @@
   .section-title{font-size:12.5px; font-weight:700; color:var(--md-primary); text-transform:uppercase; letter-spacing:0.06em; margin:22px 4px 10px;}
   .section-title:first-child{margin-top:4px;}
 
-  /* ---------- Balance card ---------- */
-  /* ---------- Rosco protagonista ---------- */
+  /* ---------- Rosco protagonista con iconos alrededor ---------- */
   .donut-hero-wrap{display:flex; flex-direction:column; align-items:center; margin:8px 0 6px;}
-  .donut-hero{position:relative; width:76vw; max-width:320px; height:76vw; max-height:320px;}
+  .donut-hero{position:relative; width:84vw; max-width:360px; height:84vw; max-height:360px;}
+  .donut-canvas-holder{position:absolute; top:18%; left:18%; width:64%; height:64%;}
+  .cat-line-svg{position:absolute; inset:0; width:100%; height:100%; pointer-events:none;}
   .donut-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
   .donut-ingresos{font-size:12px; font-weight:600; color:var(--md-success); opacity:0.85;}
   .donut-gastos-label{font-size:10.5px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.05em; margin-top:6px;}
-  .donut-gastos-amt{font-size:27px; font-weight:700; color:var(--md-on-surface); margin-top:2px;}
+  .donut-gastos-amt{font-size:26px; font-weight:700; color:var(--md-on-surface); margin-top:2px;}
   .ahorro-pill{
     margin-top:14px; padding:8px 18px; border-radius:100px; background:var(--md-surface-container-high);
     font-size:12.5px; font-weight:600; color:var(--md-on-surface-variant);
   }
   .ahorro-pill span{font-weight:700;}
 
-  .legend-list{display:flex; flex-direction:column; gap:4px; min-width:0; margin-top:4px;}
-  .legend-row{display:flex; align-items:center; gap:12px; cursor:pointer; padding:9px 4px;}
-  .legend-icon{width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
-  .legend-name{flex:1; font-size:13px; font-weight:500; color:var(--md-on-surface); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .legend-amt{font-size:12.5px; font-weight:700; color:var(--md-on-surface-variant); flex-shrink:0;}
+  .cat-icon-label{position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; cursor:pointer;}
+  .cat-icon-circ2{width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px -2px rgba(0,0,0,0.4);}
   .empty-state{color:var(--md-on-surface-variant); font-size:13.5px; text-align:center; padding:24px 12px; line-height:1.6;}
 
   /* ---------- Chips (filtros informativos) ---------- */
@@ -239,8 +237,9 @@
   <div class="view active" id="view-resumen">
     <div class="screen">
       <div class="donut-hero-wrap">
-        <div class="donut-hero">
-          <canvas id="chart-categorias"></canvas>
+        <div class="donut-hero" id="donut-hero">
+          <svg class="cat-line-svg" id="cat-lines"></svg>
+          <div class="donut-canvas-holder"><canvas id="chart-categorias"></canvas></div>
           <div class="donut-center">
             <div class="donut-ingresos" id="r-ingresos">Ingresos: 0,00 €</div>
             <div class="donut-gastos-label">gastado este mes</div>
@@ -249,8 +248,6 @@
         </div>
         <div class="ahorro-pill">Ahorro del mes: <span id="r-ahorro">0,00 €</span></div>
       </div>
-
-      <div class="legend-list" id="legend-list"></div>
 
       <div class="spinner" id="capture-spinner"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span> Leyendo ticket con IA…</div>
 
@@ -400,7 +397,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.1.0"></script>
-<script src="./app.js?v=4.1.0"></script>
+<script src="./config.js?v=4.2.0"></script>
+<script src="./app.js?v=4.2.0"></script>
 </body>
 </html>
