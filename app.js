@@ -559,7 +559,7 @@ function dibujarDonut(porCategoria) {
         type: 'doughnut',
         data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorCategoria), borderWidth: 0 }] },
         options: {
-          cutout: '68%', rotation: -90,
+          cutout: '68%',
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } },
         },
       });
