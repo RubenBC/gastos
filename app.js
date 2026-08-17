@@ -560,7 +560,7 @@ async function cargarDashboard() {
   document.getElementById('r-ingresos').textContent = 'Ingresos: ' + euros(totalIngresos);
   document.getElementById('r-gastos').textContent = euros(total);
   document.getElementById('r-ahorro').textContent = euros(ahorro);
-  document.getElementById('r-ahorro').style.color = ahorro >= 0 ? 'var(--md-success)' : 'var(--md-error)';
+  document.getElementById('r-ahorro').style.color = ahorro >= 0 ? '#E8A05C' : 'var(--md-error)';
 
   const porCategoria = {};
   data.forEach((g) => {
@@ -570,7 +570,45 @@ async function cargarDashboard() {
 
   dibujarDonut(porCategoria);
   renderMovimientos(data, comercioPorTicket, 'movimientos-list', false);
+  cargarFijosResumen(data);
 }
+
+async function cargarFijosResumen(gastosDelMes) {
+  const { data: fijos, error } = await sb.from('gastos_fijos').select('*').eq('activo', true);
+  if (error) { console.error(error); return; }
+
+  const totalFijos = (gastosDelMes || []).filter((g) => g.origen === 'fijo').reduce((a, g) => a + Number(g.importe), 0);
+  document.getElementById('fijos-resumen-total').textContent = euros(totalFijos);
+  document.getElementById('fijos-resumen-icon').innerHTML = svgInline('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10.5h18"/><path d="M6.5 14.5h4"/>', 18);
+
+  const pagadosIds = new Set((gastosDelMes || []).filter((g) => g.origen === 'fijo').map((g) => g.gasto_fijo_id));
+  const hoy = new Date().getDate();
+
+  const detalle = document.getElementById('fijos-resumen-detalle');
+  detalle.innerHTML = (fijos || []).map((f) => {
+    const pagado = pagadosIds.has(f.id);
+    let badgeClass = 'badge-proximo', badgeText = `Día ${f.dia_cobro}`;
+    if (pagado) { badgeClass = 'badge-pagado'; badgeText = 'Pagado'; }
+    else if (hoy > f.dia_cobro) { badgeClass = 'badge-confirmar'; badgeText = 'Pendiente'; }
+    return `
+      <div class="ticket-item-row" style="align-items:center;">
+        <span style="display:flex; align-items:center; gap:8px;">${iconoSVG(nombreCategoria(f.categoria_id), 15)} ${f.nombre}</span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span class="fijo-badge ${badgeClass}" style="font-size:9.5px; padding:3px 8px;">${badgeText}</span>
+          ${euros(f.importe_estimado)}
+        </span>
+      </div>
+    `;
+  }).join('') || '<div class="empty-state">Todavía no tienes gastos fijos. Añádelos en Ajustes.</div>';
+}
+
+document.getElementById('fijos-resumen-header').addEventListener('click', () => {
+  const detalle = document.getElementById('fijos-resumen-detalle');
+  const chevron = document.getElementById('fijos-resumen-chevron');
+  const abierto = detalle.style.display !== 'none';
+  detalle.style.display = abierto ? 'none' : 'block';
+  chevron.style.transform = abierto ? '' : 'rotate(180deg)';
+});
 
 function dibujarDonut(porCategoria) {
   const labels = Object.keys(porCategoria);

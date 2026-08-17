@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.3.1">
+<link rel="manifest" href="./manifest.json?v=4.4.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -74,12 +74,9 @@
   .donut-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
   .donut-ingresos{font-size:12px; font-weight:600; color:var(--md-success); opacity:0.85;}
   .donut-gastos-label{font-size:10.5px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.05em; margin-top:6px;}
-  .donut-gastos-amt{font-size:26px; font-weight:700; color:var(--md-on-surface); margin-top:2px;}
-  .ahorro-pill{
-    margin-top:14px; padding:8px 18px; border-radius:100px; background:var(--md-surface-container-high);
-    font-size:12.5px; font-weight:600; color:var(--md-on-surface-variant);
-  }
-  .ahorro-pill span{font-weight:700;}
+  .donut-gastos-amt{font-size:22px; font-weight:700; color:var(--md-on-surface); margin-top:2px;}
+  .donut-ahorro{font-size:13px; font-weight:700; color:#E8A05C; margin-top:8px;}
+  .donut-ahorro-label{font-size:9.5px; color:#E8A05C; opacity:0.75; text-transform:uppercase; letter-spacing:0.04em;}
 
   .cat-icon-label{position:absolute; transform:translate(-50%,-50%); display:flex; flex-direction:column; align-items:center; cursor:pointer;}
   .cat-icon-circ2{width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px -2px rgba(0,0,0,0.4);}
@@ -244,15 +241,28 @@
             <div class="donut-ingresos" id="r-ingresos">Ingresos: 0,00 €</div>
             <div class="donut-gastos-label">gastado este mes</div>
             <div class="donut-gastos-amt" id="r-gastos">0,00 €</div>
+            <div class="donut-ahorro-label">Queda</div>
+            <div class="donut-ahorro" id="r-ahorro">0,00 €</div>
           </div>
         </div>
-        <div class="ahorro-pill">Ahorro del mes: <span id="r-ahorro">0,00 €</span></div>
       </div>
 
       <div class="spinner" id="capture-spinner"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span> Leyendo ticket con IA…</div>
 
       <div class="section-title">Movimientos recientes</div>
       <div id="movimientos-list"></div>
+
+      <div class="m3-card" id="fijos-resumen-card" style="padding:0; overflow:hidden;">
+        <div class="ticket-card-header" id="fijos-resumen-header" style="cursor:pointer;">
+          <div class="ticket-card-icon" id="fijos-resumen-icon" style="background:var(--md-secondary-container); color:var(--md-on-secondary-container);"></div>
+          <div class="ticket-card-info">
+            <div class="ticket-card-name">Gastos fijos</div>
+          </div>
+          <div class="ticket-card-amt" id="fijos-resumen-total">0,00 €</div>
+          <span class="ticket-chevron" id="fijos-resumen-chevron">▾</span>
+        </div>
+        <div id="fijos-resumen-detalle" style="display:none; padding:0 16px 14px;"></div>
+      </div>
     </div>
   </div>
 
@@ -397,7 +407,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.3.1"></script>
-<script src="./app.js?v=4.3.1"></script>
+<script src="./config.js?v=4.4.0"></script>
+<script src="./app.js?v=4.4.0"></script>
 </body>
 </html>
