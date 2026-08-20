@@ -80,6 +80,34 @@ let ticketActual = null;
 let modalManualEditId = null;
 let nominaEsteMesId = null;
 let chartCategorias = null;
+let mesActual = new Date();
+
+function rangoMesActual() {
+  const y = mesActual.getFullYear(), m = mesActual.getMonth();
+  return { inicio: fechaLocal(y, m, 1), fin: fechaLocal(y, m, ultimoDiaMes(y, m)) };
+}
+function esMesActualReal() {
+  const hoy = new Date();
+  return mesActual.getFullYear() === hoy.getFullYear() && mesActual.getMonth() === hoy.getMonth();
+}
+function actualizarTopbarMes() {
+  document.getElementById('topbar-month').textContent = mesActual.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  document.getElementById('mes-siguiente').disabled = esMesActualReal();
+}
+function refrescarVistaActual() {
+  actualizarTopbarMes();
+  if (document.getElementById('view-resumen').classList.contains('active')) cargarDashboard();
+  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
+}
+document.getElementById('mes-anterior').addEventListener('click', () => {
+  mesActual = new Date(mesActual.getFullYear(), mesActual.getMonth() - 1, 1);
+  refrescarVistaActual();
+});
+document.getElementById('mes-siguiente').addEventListener('click', () => {
+  if (esMesActualReal()) return;
+  mesActual = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
+  refrescarVistaActual();
+});
 
 function poblarSelectCategorias(sel, categoriaIdActual) {
   const activas = categoriasCache.filter((c) => c.activa);
@@ -118,7 +146,7 @@ async function mostrarApp() {
   document.getElementById('app').style.display = 'flex';
   document.getElementById('version-tag').textContent = 'v' + CONFIG.APP_VERSION;
   document.getElementById('manual-fecha').value = hoyISO();
-  document.getElementById('topbar-month').textContent = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  actualizarTopbarMes();
 
   if (localStorage.getItem('gastos-tema') === 'claro') {
     document.body.classList.add('tema-claro');
@@ -127,6 +155,7 @@ async function mostrarApp() {
 
   await cargarCategorias();
   await cargarDashboard();
+  await cargarPendientes();
 }
 
 document.getElementById('tema-toggle').addEventListener('click', () => {
@@ -370,6 +399,7 @@ async function procesarFotoTicket(e) {
 
     ticketActual = resultado;
     renderRevisarModal();
+    cargarPendientes();
   } catch (err) {
     alert('No se pudo leer el ticket: ' + err.message);
   } finally {
@@ -427,6 +457,48 @@ function renderRevisarModal() {
   document.getElementById('modal-revisar').classList.add('open');
 }
 
+async function cargarPendientes() {
+  const { data, error } = await sb.from('tickets').select('id, comercio, fecha, importe_total').eq('estado', 'pendiente').order('fecha', { ascending: false });
+  if (error) { console.error(error); return; }
+
+  const cont = document.getElementById('pendientes-banner-cont');
+  if (!data || !data.length) { cont.innerHTML = ''; return; }
+
+  cont.innerHTML = `
+    <div class="pendientes-banner" id="pendientes-banner">
+      <div class="pendientes-banner-row">
+        <div class="pendientes-banner-text">⚠️ ${data.length} ticket${data.length > 1 ? 's' : ''} sin revisar</div>
+        <span class="ticket-chevron" id="pendientes-chevron">▾</span>
+      </div>
+      <div class="pendientes-lista">
+        ${data.map((t) => `
+          <div class="pendiente-row" data-ticket-id="${t.id}">
+            <span>${t.comercio} · ${new Date(t.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</span>
+            <span>${euros(t.importe_total)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  document.querySelector('.pendientes-banner-row').addEventListener('click', () => {
+    document.getElementById('pendientes-banner').classList.toggle('open');
+  });
+  cont.querySelectorAll('.pendiente-row').forEach((row) => {
+    row.addEventListener('click', (e) => { e.stopPropagation(); reabrirTicketPendiente(row.dataset.ticketId); });
+  });
+}
+
+async function reabrirTicketPendiente(ticketId) {
+  const { data: ticket, error: errorTicket } = await sb.from('tickets').select('*').eq('id', ticketId).single();
+  if (errorTicket || !ticket) { alert('No se pudo abrir el ticket: ' + errorTicket?.message); return; }
+  const { data: items, error: errorItems } = await sb.from('ticket_items').select('*').eq('ticket_id', ticketId);
+  if (errorItems) { alert('No se pudieron cargar los artículos: ' + errorItems.message); return; }
+
+  ticketActual = { ticket, items: items || [] };
+  renderRevisarModal();
+}
+
 async function descartarTicket() {
   if (!ticketActual) return;
   if (!confirm('¿Descartar este ticket?')) return;
@@ -434,6 +506,7 @@ async function descartarTicket() {
   if (error) { alert('No se pudo descartar: ' + error.message); return; }
   ticketActual = null;
   document.getElementById('modal-revisar').classList.remove('open');
+  cargarPendientes();
 }
 
 async function conformarTicket() {
@@ -473,6 +546,7 @@ async function conformarTicket() {
     ticketActual = null;
     document.getElementById('modal-revisar').classList.remove('open');
     cargarDashboard();
+    cargarPendientes();
   } catch (err) {
     alert('No se pudo conformar el ticket:\n\n' + err.message + '\n\nSigue en pendiente. Vuelve a intentarlo.');
   }
@@ -539,9 +613,7 @@ function editarGasto(row) {
 
 // ---------------- RESUMEN (dashboard) ----------------
 async function cargarDashboard() {
-  const hoy = new Date();
-  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
-  const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), ultimoDiaMes(hoy.getFullYear(), hoy.getMonth()));
+  const { inicio: inicioMes, fin: finMes } = rangoMesActual();
 
   const { data, error } = await sb.from('gastos').select('*').gte('fecha', inicioMes).lte('fecha', finMes).eq('estado', 'confirmado').order('fecha', { ascending: false });
   if (error) { alert('No se pudo cargar el resumen: ' + error.message); return; }
@@ -583,12 +655,14 @@ async function cargarFijosResumen(gastosDelMes) {
 
   const pagadosIds = new Set((gastosDelMes || []).filter((g) => g.origen === 'fijo').map((g) => g.gasto_fijo_id));
   const hoy = new Date().getDate();
+  const mesReal = esMesActualReal();
 
   const detalle = document.getElementById('fijos-resumen-detalle');
   detalle.innerHTML = (fijos || []).map((f) => {
     const pagado = pagadosIds.has(f.id);
     let badgeClass = 'badge-proximo', badgeText = `Día ${f.dia_cobro}`;
     if (pagado) { badgeClass = 'badge-pagado'; badgeText = 'Pagado'; }
+    else if (!mesReal) { badgeClass = 'badge-confirmar'; badgeText = 'No registrado'; }
     else if (hoy > f.dia_cobro) { badgeClass = 'badge-confirmar'; badgeText = 'Pendiente'; }
     return `
       <div class="ticket-item-row" style="align-items:center;">
@@ -677,9 +751,7 @@ function posicionarIconosDonut(labels, valores) {
 
 // ---------------- POPUP: detalle de una categoría ----------------
 async function abrirDetalleCategoria(nombreCat) {
-  const hoy = new Date();
-  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
-  const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), ultimoDiaMes(hoy.getFullYear(), hoy.getMonth()));
+  const { inicio: inicioMes, fin: finMes } = rangoMesActual();
   const catId = categoriasCache.find((c) => c.nombre === nombreCat)?.id;
 
   const { data } = await sb.from('gastos').select('*').eq('categoria_id', catId).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
@@ -777,9 +849,7 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
 const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Otros'];
 
 async function cargarTickets() {
-  const hoy = new Date();
-  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
-  const finMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), ultimoDiaMes(hoy.getFullYear(), hoy.getMonth()));
+  const { inicio: inicioMes, fin: finMes } = rangoMesActual();
 
   const { data, error } = await sb.from('gastos').select('*').in('origen', ['ticket', 'manual']).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
   if (error) { alert('No se pudieron cargar los tickets: ' + error.message); return; }

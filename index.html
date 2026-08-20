@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.4.0">
+<link rel="manifest" href="./manifest.json?v=4.5.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -55,7 +55,20 @@
   #app{display:none; flex-direction:column; min-height:100vh;}
   .topbar{padding:20px 20px 4px;}
   .topbar-title{font-size:15px; font-weight:600; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.08em;}
-  .topbar-month{font-size:26px; font-weight:700; color:var(--md-on-surface); text-transform:capitalize; margin-top:2px;}
+  .topbar-month{font-size:22px; font-weight:700; color:var(--md-on-surface); text-transform:capitalize;}
+  .month-nav{display:flex; align-items:center; gap:12px; margin-top:2px;}
+  .month-nav-btn{
+    background:var(--md-surface-container-high); border:none; width:32px; height:32px; border-radius:50%;
+    color:var(--md-on-surface); font-size:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .month-nav-btn:disabled{opacity:0.3;}
+
+  .pendientes-banner{background:var(--md-error-container); color:var(--md-on-error-container); border-radius:20px; padding:14px 16px; margin-bottom:12px; cursor:pointer;}
+  .pendientes-banner-row{display:flex; align-items:center; gap:10px;}
+  .pendientes-banner-text{flex:1; font-size:13px; font-weight:700;}
+  .pendientes-lista{margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.15); display:none;}
+  .pendientes-banner.open .pendientes-lista{display:block;}
+  .pendiente-row{display:flex; justify-content:space-between; padding:7px 0; font-size:12.5px; cursor:pointer;}
 
   .view{display:none;}
   .view.active{display:block;}
@@ -227,12 +240,18 @@
 <div id="app">
   <div class="topbar">
     <div class="topbar-title">Gastos</div>
-    <div class="topbar-month" id="topbar-month">—</div>
+    <div class="month-nav">
+      <button class="month-nav-btn" id="mes-anterior">‹</button>
+      <div class="topbar-month" id="topbar-month">—</div>
+      <button class="month-nav-btn" id="mes-siguiente">›</button>
+    </div>
   </div>
 
   <!-- RESUMEN -->
   <div class="view active" id="view-resumen">
     <div class="screen">
+      <div id="pendientes-banner-cont"></div>
+
       <div class="donut-hero-wrap">
         <div class="donut-hero" id="donut-hero">
           <svg class="cat-line-svg" id="cat-lines"></svg>
@@ -407,7 +426,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.4.0"></script>
-<script src="./app.js?v=4.4.0"></script>
+<script src="./config.js?v=4.5.0"></script>
+<script src="./app.js?v=4.5.0"></script>
 </body>
 </html>
