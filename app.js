@@ -719,7 +719,7 @@ function posicionarIconosDonut(labels, valores) {
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
 
   const cx = size / 2, cy = size / 2;
-  const donutR = size * 0.335, lineRbase = size * 0.41, iconRbase = size * 0.44, iconRmax = size * 0.48;
+  const donutR = size * 0.335, iconRbase = size * 0.40, iconRmax = size * 0.52;
   const total = valores.reduce((a, b) => a + b, 0) || 1;
   const maxValor = Math.max(...valores);
   let acumulado = 0;
@@ -734,7 +734,7 @@ function posicionarIconosDonut(labels, valores) {
     // Cuanto más pequeño el gasto respecto al mayor, más se aleja el icono del rosco
     const factorPequeño = 1 - (valores[i] / maxValor);
     const iconR = iconRbase + factorPequeño * (iconRmax - iconRbase);
-    const lineR = lineRbase + factorPequeño * (iconRmax - iconRbase) * 0.55;
+    const lineR = iconR - size * 0.035; // la línea siempre termina justo antes del icono
 
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', cx + donutR * Math.cos(angleRad));
