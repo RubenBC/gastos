@@ -80,19 +80,49 @@ let ticketActual = null;
 let modalManualEditId = null;
 let nominaEsteMesId = null;
 let chartCategorias = null;
-let mesActual = new Date();
+let periodosCache = []; // fechas de inicio de cada reinicio manual, ordenadas
+let cursorFecha = hoyISO(); // fecha de referencia: qué periodo se está mirando ahora mismo
 
-function rangoMesActual() {
-  const y = mesActual.getFullYear(), m = mesActual.getMonth();
-  return { inicio: fechaLocal(y, m, 1), fin: fechaLocal(y, m, ultimoDiaMes(y, m)) };
+function addDias(fechaISO, n) {
+  const d = new Date(fechaISO + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return fechaLocal(d.getFullYear(), d.getMonth(), d.getDate());
 }
-function esMesActualReal() {
-  const hoy = new Date();
-  return mesActual.getFullYear() === hoy.getFullYear() && mesActual.getMonth() === hoy.getMonth();
+
+async function cargarPeriodos() {
+  const { data } = await sb.from('periodos').select('fecha_inicio').order('fecha_inicio');
+  periodosCache = (data || []).map((p) => p.fecha_inicio);
 }
+
+// Calcula {inicio, fin, esActual} del periodo al que pertenece fechaRefISO,
+// combinando los reinicios manuales guardados con el mes de calendario como respaldo.
+function calcularPeriodo(fechaRefISO) {
+  const anteriores = periodosCache.filter((p) => p <= fechaRefISO);
+  let inicio, fin;
+
+  if (anteriores.length === 0) {
+    const d = new Date(fechaRefISO + 'T00:00:00');
+    const y = d.getFullYear(), m = d.getMonth();
+    inicio = fechaLocal(y, m, 1);
+    const finCalendario = fechaLocal(y, m, ultimoDiaMes(y, m));
+    const dentro = periodosCache.filter((p) => p > inicio && p <= finCalendario);
+    fin = dentro.length ? addDias(dentro[0], -1) : finCalendario;
+  } else {
+    inicio = anteriores[anteriores.length - 1];
+    const siguientes = periodosCache.filter((p) => p > inicio);
+    fin = siguientes.length ? addDias(siguientes[0], -1) : hoyISO();
+  }
+
+  return { inicio, fin, esActual: fin >= hoyISO() };
+}
+
 function actualizarTopbarMes() {
-  document.getElementById('topbar-month').textContent = mesActual.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-  document.getElementById('mes-siguiente').disabled = esMesActualReal();
+  const rango = calcularPeriodo(cursorFecha);
+  const opts = { day: '2-digit', month: 'short' };
+  const iniTxt = new Date(rango.inicio + 'T00:00:00').toLocaleDateString('es-ES', opts);
+  const finTxt = rango.esActual ? 'hoy' : new Date(rango.fin + 'T00:00:00').toLocaleDateString('es-ES', opts);
+  document.getElementById('topbar-month').textContent = `${iniTxt} – ${finTxt}`;
+  document.getElementById('mes-siguiente').disabled = rango.esActual;
 }
 function refrescarVistaActual() {
   actualizarTopbarMes();
@@ -100,13 +130,31 @@ function refrescarVistaActual() {
   if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
 }
 document.getElementById('mes-anterior').addEventListener('click', () => {
-  mesActual = new Date(mesActual.getFullYear(), mesActual.getMonth() - 1, 1);
+  const rango = calcularPeriodo(cursorFecha);
+  cursorFecha = addDias(rango.inicio, -1);
   refrescarVistaActual();
 });
 document.getElementById('mes-siguiente').addEventListener('click', () => {
-  if (esMesActualReal()) return;
-  mesActual = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
+  const rango = calcularPeriodo(cursorFecha);
+  if (rango.esActual) return;
+  cursorFecha = addDias(rango.fin, 1);
   refrescarVistaActual();
+});
+
+document.getElementById('reiniciar-periodo-btn').addEventListener('click', async () => {
+  if (!confirm('¿Reiniciar el periodo hoy? A partir de ahora, "este mes" contará desde hoy. El periodo anterior queda guardado tal cual, podrás seguir viéndolo con la flecha ‹.')) return;
+  const { error } = await sb.from('periodos').insert({ fecha_inicio: hoyISO() });
+  if (error) {
+    if (error.code === '23505') alert('Ya has reiniciado el periodo hoy.');
+    else alert('No se pudo reiniciar: ' + error.message);
+    return;
+  }
+  await cargarPeriodos();
+  cursorFecha = hoyISO();
+  refrescarVistaActual();
+  cargarNominaConfig();
+  cargarFijosConfig();
+  alert('Periodo reiniciado. Ya puedes meter la nómina de este nuevo periodo.');
 });
 
 function poblarSelectCategorias(sel, categoriaIdActual) {
@@ -153,6 +201,7 @@ async function mostrarApp() {
     document.getElementById('tema-toggle').classList.remove('off');
   }
 
+  await cargarPeriodos();
   await cargarCategorias();
   await cargarDashboard();
   await cargarPendientes();
@@ -218,22 +267,21 @@ document.getElementById('add-cat-btn').addEventListener('click', async () => {
 
 // ---------------- NÓMINA ----------------
 async function cargarNominaConfig() {
-  const hoy = new Date();
-  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
-  const inicioMesAnterior = fechaLocal(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+  const rangoActual = calcularPeriodo(hoyISO());
+  const rangoAnterior = calcularPeriodo(addDias(rangoActual.inicio, -1));
 
-  const { data: esteMes } = await sb.from('ingresos').select('*').gte('fecha', inicioMes).order('fecha', { ascending: false }).limit(1);
-  const { data: mesAnterior } = await sb.from('ingresos').select('*').gte('fecha', inicioMesAnterior).lt('fecha', inicioMes).order('fecha', { ascending: false }).limit(1);
+  const { data: esteMes } = await sb.from('ingresos').select('*').gte('fecha', rangoActual.inicio).order('fecha', { ascending: false }).limit(1);
+  const { data: mesAnterior } = await sb.from('ingresos').select('*').gte('fecha', rangoAnterior.inicio).lt('fecha', rangoActual.inicio).order('fecha', { ascending: false }).limit(1);
 
   const hint = document.getElementById('nomina-hint');
   if (esteMes && esteMes.length) {
     nominaEsteMesId = esteMes[0].id;
     document.getElementById('nomina-importe').value = esteMes[0].importe;
-    hint.textContent = 'Ya la registraste este mes. Puedes corregirla.';
+    hint.textContent = 'Ya la registraste este periodo. Puedes corregirla.';
   } else {
     nominaEsteMesId = null;
     document.getElementById('nomina-importe').value = mesAnterior?.[0]?.importe || '';
-    hint.textContent = mesAnterior?.length ? `Precargada con la del mes pasado (${euros(mesAnterior[0].importe)}). Ajústala y guarda.` : 'Todavía no has metido ninguna nómina.';
+    hint.textContent = mesAnterior?.length ? `Precargada con la del periodo pasado (${euros(mesAnterior[0].importe)}). Ajústala y guarda.` : 'Todavía no has metido ninguna nómina.';
   }
 }
 
@@ -254,9 +302,8 @@ async function cargarFijosConfig() {
   const { data: fijos, error } = await sb.from('gastos_fijos').select('*').eq('activo', true);
   if (error) { console.error(error); return; }
 
-  const hoy = new Date();
-  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
-  const { data: gastosDelMes } = await sb.from('gastos').select('gasto_fijo_id').eq('origen', 'fijo').eq('estado', 'confirmado').gte('fecha', inicioMes);
+  const rangoActual = calcularPeriodo(hoyISO());
+  const { data: gastosDelMes } = await sb.from('gastos').select('gasto_fijo_id').eq('origen', 'fijo').eq('estado', 'confirmado').gte('fecha', rangoActual.inicio);
   const pagadosIds = new Set((gastosDelMes || []).map((g) => g.gasto_fijo_id));
 
   const cont = document.getElementById('fijos-list');
@@ -356,9 +403,7 @@ document.getElementById('fijo-guardar').addEventListener('click', async () => {
   if (!nombre || !importe || !dia || !categoriaId) { alert('Rellena todos los campos.'); return; }
 
   await sb.from('gastos_fijos').update({ nombre, categoria_id: categoriaId, importe_estimado: importe, dia_cobro: dia, importe_es_fijo: !variable }).eq('id', fijoId);
-  const hoy = new Date();
-  const inicioMes = fechaLocal(hoy.getFullYear(), hoy.getMonth(), 1);
-  await sb.from('gastos').update({ categoria_id: categoriaId, descripcion: nombre }).eq('gasto_fijo_id', fijoId).gte('fecha', inicioMes);
+  await sb.from('gastos').update({ categoria_id: categoriaId, descripcion: nombre }).eq('gasto_fijo_id', fijoId).gte('fecha', calcularPeriodo(hoyISO()).inicio);
 
   document.getElementById('modal-fijo').classList.remove('open');
   cargarFijosConfig();
@@ -613,7 +658,7 @@ function editarGasto(row) {
 
 // ---------------- RESUMEN (dashboard) ----------------
 async function cargarDashboard() {
-  const { inicio: inicioMes, fin: finMes } = rangoMesActual();
+  const { inicio: inicioMes, fin: finMes } = calcularPeriodo(cursorFecha);
 
   const { data, error } = await sb.from('gastos').select('*').gte('fecha', inicioMes).lte('fecha', finMes).eq('estado', 'confirmado').order('fecha', { ascending: false });
   if (error) { alert('No se pudo cargar el resumen: ' + error.message); return; }
@@ -655,7 +700,7 @@ async function cargarFijosResumen(gastosDelMes) {
 
   const pagadosIds = new Set((gastosDelMes || []).filter((g) => g.origen === 'fijo').map((g) => g.gasto_fijo_id));
   const hoy = new Date().getDate();
-  const mesReal = esMesActualReal();
+  const mesReal = calcularPeriodo(cursorFecha).esActual;
 
   const detalle = document.getElementById('fijos-resumen-detalle');
   detalle.innerHTML = (fijos || []).map((f) => {
@@ -705,59 +750,24 @@ function dibujarDonut(porCategoria) {
     console.error('Error dibujando la gráfica:', err);
   }
 
-  requestAnimationFrame(() => posicionarIconosDonut(labels, valores));
-}
+  const legend = document.getElementById('legend-list');
+  const ordenado = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
+  legend.innerHTML = ordenado.map(([nombre, importe]) => `
+    <div class="legend-row" data-nombre="${nombre}">
+      <div class="legend-dot" style="background:${colorCategoria(nombre)};"></div>
+      <div class="legend-name">${nombre}</div>
+      <div class="legend-amt">${euros(importe)}</div>
+    </div>
+  `).join('') || '<div class="empty-state" style="padding:0;">Sin gastos este periodo.</div>';
 
-function posicionarIconosDonut(labels, valores) {
-  const wrap = document.getElementById('donut-hero');
-  wrap.querySelectorAll('.cat-icon-label').forEach((el) => el.remove());
-  const svg = document.getElementById('cat-lines');
-  svg.innerHTML = '';
-
-  const size = wrap.clientWidth;
-  if (!size || !labels.length) { svg.setAttribute('viewBox', '0 0 1 1'); return; }
-  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
-
-  const cx = size / 2, cy = size / 2;
-  const donutR = size * 0.335, iconRbase = size * 0.40, iconRmax = size * 0.52;
-  const total = valores.reduce((a, b) => a + b, 0) || 1;
-  const maxValor = Math.max(...valores);
-  let acumulado = 0;
-
-  labels.forEach((nombre, i) => {
-    const frac = valores[i] / total;
-    const midFrac = acumulado + frac / 2;
-    acumulado += frac;
-    const angleRad = (-90 + midFrac * 360) * Math.PI / 180;
-    const color = colorCategoria(nombre);
-
-    // Cuanto más pequeño el gasto respecto al mayor, más se aleja el icono del rosco
-    const factorPequeño = 1 - (valores[i] / maxValor);
-    const iconR = iconRbase + factorPequeño * (iconRmax - iconRbase);
-    const lineR = iconR - size * 0.035; // la línea siempre termina justo antes del icono
-
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', cx + donutR * Math.cos(angleRad));
-    line.setAttribute('y1', cy + donutR * Math.sin(angleRad));
-    line.setAttribute('x2', cx + lineR * Math.cos(angleRad));
-    line.setAttribute('y2', cy + lineR * Math.sin(angleRad));
-    line.setAttribute('stroke', color);
-    line.setAttribute('stroke-width', '1.6');
-    svg.appendChild(line);
-
-    const label = document.createElement('div');
-    label.className = 'cat-icon-label';
-    label.style.left = (cx + iconR * Math.cos(angleRad)) + 'px';
-    label.style.top = (cy + iconR * Math.sin(angleRad)) + 'px';
-    label.innerHTML = `<div class="cat-icon-circ2" style="background:${color}40; color:${color};">${iconoSVG(nombre, 17)}</div>`;
-    label.addEventListener('click', () => abrirDetalleCategoria(nombre));
-    wrap.appendChild(label);
+  legend.querySelectorAll('.legend-row').forEach((row) => {
+    row.addEventListener('click', () => abrirDetalleCategoria(row.dataset.nombre));
   });
 }
 
 // ---------------- POPUP: detalle de una categoría ----------------
 async function abrirDetalleCategoria(nombreCat) {
-  const { inicio: inicioMes, fin: finMes } = rangoMesActual();
+  const { inicio: inicioMes, fin: finMes } = calcularPeriodo(cursorFecha);
   const catId = categoriasCache.find((c) => c.nombre === nombreCat)?.id;
 
   const { data } = await sb.from('gastos').select('*').eq('categoria_id', catId).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
@@ -855,7 +865,7 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
 const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Otros'];
 
 async function cargarTickets() {
-  const { inicio: inicioMes, fin: finMes } = rangoMesActual();
+  const { inicio: inicioMes, fin: finMes } = calcularPeriodo(cursorFecha);
 
   const { data, error } = await sb.from('gastos').select('*').in('origen', ['ticket', 'manual']).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
   if (error) { alert('No se pudieron cargar los tickets: ' + error.message); return; }
