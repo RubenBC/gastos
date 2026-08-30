@@ -302,6 +302,7 @@ async function cargarFijosConfig() {
   const { data: fijos, error } = await sb.from('gastos_fijos').select('*').eq('activo', true);
   if (error) { console.error(error); return; }
 
+  const hoy = new Date();
   const rangoActual = calcularPeriodo(hoyISO());
   const { data: gastosDelMes } = await sb.from('gastos').select('gasto_fijo_id').eq('origen', 'fijo').eq('estado', 'confirmado').gte('fecha', rangoActual.inicio);
   const pagadosIds = new Set((gastosDelMes || []).map((g) => g.gasto_fijo_id));
@@ -405,6 +406,15 @@ document.getElementById('fijo-guardar').addEventListener('click', async () => {
   await sb.from('gastos_fijos').update({ nombre, categoria_id: categoriaId, importe_estimado: importe, dia_cobro: dia, importe_es_fijo: !variable }).eq('id', fijoId);
   await sb.from('gastos').update({ categoria_id: categoriaId, descripcion: nombre }).eq('gasto_fijo_id', fijoId).gte('fecha', calcularPeriodo(hoyISO()).inicio);
 
+  document.getElementById('modal-fijo').classList.remove('open');
+  cargarFijosConfig();
+});
+
+document.getElementById('fijo-borrar').addEventListener('click', async () => {
+  const fijoId = document.getElementById('modal-fijo').dataset.fijoId;
+  if (!confirm('¿Borrar este gasto fijo? Los pagos ya registrados de meses anteriores se mantienen, pero dejará de aparecer en la lista y no se volverá a pedir.')) return;
+  const { error } = await sb.from('gastos_fijos').update({ activo: false }).eq('id', fijoId);
+  if (error) { alert('No se pudo borrar: ' + error.message); return; }
   document.getElementById('modal-fijo').classList.remove('open');
   cargarFijosConfig();
 });
