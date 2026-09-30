@@ -698,7 +698,96 @@ async function cargarDashboard() {
   dibujarDonut(porCategoria);
   renderMovimientos(data, comercioPorTicket, 'movimientos-list', false);
   cargarFijosResumen(data);
+  cargarAhorroResumen();
 }
+
+let ahorroEstePeriodoId = null;
+let chartAhorro = null;
+
+async function cargarAhorroResumen() {
+  const { data: historial, error } = await sb.from('ahorros').select('*').order('fecha', { ascending: true });
+  if (error) { console.error(error); return; }
+
+  const rangoActual = calcularPeriodo(hoyISO());
+  const esteRegistro = (historial || []).find((a) => a.fecha >= rangoActual.inicio);
+  const hint = document.getElementById('ahorro-hint');
+
+  if (esteRegistro) {
+    ahorroEstePeriodoId = esteRegistro.id;
+    document.getElementById('ahorro-importe').value = esteRegistro.saldo;
+    hint.textContent = 'Ya lo registraste este periodo. Puedes corregirlo.';
+  } else {
+    ahorroEstePeriodoId = null;
+    document.getElementById('ahorro-importe').value = '';
+    hint.textContent = 'Apunta el saldo actual de tu cuenta de ahorro.';
+  }
+
+  const ultimo = historial && historial.length ? historial[historial.length - 1] : null;
+  const anterior = historial && historial.length > 1 ? historial[historial.length - 2] : null;
+
+  document.getElementById('ahorro-saldo-actual').textContent = ultimo ? euros(ultimo.saldo) : '—';
+  const diffEl = document.getElementById('ahorro-diff');
+  if (ultimo && anterior) {
+    const diff = ultimo.saldo - anterior.saldo;
+    diffEl.textContent = (diff >= 0 ? '+' : '') + euros(diff) + ' desde el periodo pasado';
+    diffEl.style.color = diff >= 0 ? 'var(--md-success)' : 'var(--md-error)';
+  } else {
+    diffEl.textContent = ultimo ? 'Primer registro' : 'Sin registros todavía';
+    diffEl.style.color = '';
+  }
+
+  // Histórico + gráfica
+  const canvas = document.getElementById('chart-ahorro');
+  if (chartAhorro) { chartAhorro.destroy(); chartAhorro = null; }
+  if (historial && historial.length) {
+    chartAhorro = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: historial.map((a) => new Date(a.fecha + 'T00:00:00').toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })),
+        datasets: [{ data: historial.map((a) => a.saldo), backgroundColor: '#8FCB86', borderRadius: 6 }],
+      },
+      options: {
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => euros(ctx.raw) } } },
+        scales: { x: { grid: { display: false } }, y: { display: false } },
+      },
+    });
+  }
+
+  const listaHtml = document.getElementById('ahorro-historial');
+  listaHtml.innerHTML = [...(historial || [])].reverse().map((a, i, arr) => {
+    const prev = arr[i + 1];
+    const diff = prev ? a.saldo - prev.saldo : null;
+    const diffTxt = diff === null ? '' : ` <span style="font-weight:700; color:${diff >= 0 ? 'var(--md-success)' : 'var(--md-error)'};">${diff >= 0 ? '+' : ''}${euros(diff)}</span>`;
+    return `
+      <div class="ticket-item-row">
+        <span>${new Date(a.fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+        <span>${euros(a.saldo)}${diffTxt}</span>
+      </div>
+    `;
+  }).join('') || '<div class="empty-state">Todavía no has registrado ningún saldo.</div>';
+}
+
+document.getElementById('ahorro-header').addEventListener('click', () => {
+  const detalle = document.getElementById('ahorro-detalle');
+  const chevron = document.getElementById('ahorro-chevron');
+  const abierto = detalle.style.display !== 'none';
+  detalle.style.display = abierto ? 'none' : 'block';
+  chevron.style.transform = abierto ? '' : 'rotate(180deg)';
+});
+
+document.getElementById('ahorro-guardar').addEventListener('click', async () => {
+  const saldo = parseFloat(document.getElementById('ahorro-importe').value);
+  if (isNaN(saldo)) { alert('Pon el saldo actual.'); return; }
+
+  let error;
+  if (ahorroEstePeriodoId) {
+    ({ error } = await sb.from('ahorros').update({ saldo }).eq('id', ahorroEstePeriodoId));
+  } else {
+    ({ error } = await sb.from('ahorros').insert({ fecha: hoyISO(), saldo }));
+  }
+  if (error) { alert('No se pudo guardar: ' + error.message); return; }
+  cargarAhorroResumen();
+});
 
 async function cargarFijosResumen(gastosDelMes) {
   const { data: fijos, error } = await sb.from('gastos_fijos').select('*').eq('activo', true);

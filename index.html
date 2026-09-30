@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.6.2">
+<link rel="manifest" href="./manifest.json?v=4.7.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -285,6 +285,29 @@
         </div>
         <div id="fijos-resumen-detalle" style="display:none; padding:0 16px 14px;"></div>
       </div>
+
+      <div class="m3-card" id="ahorro-card">
+        <div class="ticket-card-header" id="ahorro-header" style="cursor:pointer; padding:0;">
+          <div class="ticket-card-icon" style="background:var(--md-primary-container); color:var(--md-on-primary-container);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></div>
+          <div class="ticket-card-info">
+            <div class="ticket-card-name">Ahorro</div>
+            <div class="hint-text" id="ahorro-diff" style="margin-top:0;"></div>
+          </div>
+          <div class="ticket-card-amt" id="ahorro-saldo-actual">0,00 €</div>
+          <span class="ticket-chevron" id="ahorro-chevron">▾</span>
+        </div>
+
+        <div class="nomina-row" style="margin-top:14px;">
+          <input type="number" id="ahorro-importe" placeholder="Saldo de la cuenta €" step="0.01">
+          <button id="ahorro-guardar">Guardar</button>
+        </div>
+        <div class="hint-text" id="ahorro-hint"></div>
+
+        <div id="ahorro-detalle" style="display:none; margin-top:14px;">
+          <div style="position:relative; height:130px; margin-bottom:12px;"><canvas id="chart-ahorro"></canvas></div>
+          <div id="ahorro-historial"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -437,7 +460,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.6.2"></script>
-<script src="./app.js?v=4.6.2"></script>
+<script src="./config.js?v=4.7.0"></script>
+<script src="./app.js?v=4.7.0"></script>
 </body>
 </html>
