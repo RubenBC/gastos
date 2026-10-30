@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.8.1">
+<link rel="manifest" href="./manifest.json?v=4.8.2">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -204,6 +204,8 @@
   .check-inline input{width:auto;}
 
   .cat-row{display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--md-surface-container); border-radius:18px; margin-bottom:7px;}
+  .cat-del{background:none; border:none; color:var(--md-error); opacity:0.8; padding:6px; margin-right:6px; display:flex;}
+  .cat-row-right{display:flex; align-items:center;}
   .cat-row-left{display:flex; align-items:center; gap:11px;}
   .cat-icon-circ{width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px;}
   .cat-name{font-size:13.5px; font-weight:600; color:var(--md-on-surface);}
@@ -278,7 +280,7 @@
 
 <div id="app">
   <div class="topbar">
-    <div class="topbar-title">Gastos</div>
+    <div class="topbar-title">Gastos <span id="topbar-version" style="font-weight:500; opacity:0.6; text-transform:none; letter-spacing:0; font-size:12px; margin-left:6px;"></span></div>
     <div class="month-nav">
       <button class="month-nav-btn" id="mes-anterior">‹</button>
       <div class="topbar-month" id="topbar-month">—</div>
@@ -510,7 +512,7 @@
 <div class="toast" id="toast"><span class="toast-msg" id="toast-msg"></span><button class="toast-undo" id="toast-undo">Deshacer</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.8.1"></script>
-<script src="./app.js?v=4.8.1"></script>
+<script src="./config.js?v=4.8.2"></script>
+<script src="./app.js?v=4.8.2"></script>
 </body>
 </html>

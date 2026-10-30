@@ -219,6 +219,7 @@ async function mostrarApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('version-tag').textContent = 'v' + CONFIG.APP_VERSION;
+  document.getElementById('topbar-version').textContent = 'v' + CONFIG.APP_VERSION;
   document.getElementById('manual-fecha').value = hoyISO();
   actualizarTopbarMes();
 
@@ -303,9 +304,13 @@ function renderCategorias() {
         <div class="cat-icon-circ" style="background:${colorCategoria(c.nombre)}33; color:${colorCategoria(c.nombre)};">${iconoCategoria(c.nombre)}</div>
         <div class="cat-name">${c.nombre}</div>
       </div>
-      <button class="m3-switch ${c.activa ? '' : 'off'}" data-id="${c.id}" data-activa="${c.activa}"></button>
+      <div class="cat-row-right">
+        ${c.nombre.toLowerCase() === 'otros' ? '' : `<button class="cat-del" data-del="${c.id}" aria-label="Eliminar">${svgInline(ICONO_PAPELERA, 17)}</button>`}
+        <button class="m3-switch ${c.activa ? '' : 'off'}" data-id="${c.id}" data-activa="${c.activa}"></button>
+      </div>
     </div>
   `).join('');
+  cont.querySelectorAll('.cat-del').forEach((btn) => btn.addEventListener('click', () => eliminarCategoria(btn.dataset.del)));
   cont.querySelectorAll('.m3-switch').forEach((btn) => {
     btn.addEventListener('click', async () => {
       await sb.from('categorias').update({ activa: btn.dataset.activa !== 'true' }).eq('id', btn.dataset.id);
@@ -313,6 +318,31 @@ function renderCategorias() {
       renderCategorias();
     });
   });
+}
+
+async function eliminarCategoria(id) {
+  const cat = categoriasCache.find((c) => c.id === id);
+  const otros = categoriasCache.find((c) => c.nombre.toLowerCase() === 'otros');
+  if (!cat) return;
+  if (!otros) { alert('Necesitas la categoría "Otros" para poder eliminar otras: a ella pasarán sus gastos.'); return; }
+  if (!confirm(`¿Eliminar "${cat.nombre}"?\n\nSus gastos, artículos y gastos fijos pasarán a "Otros". Esto no se puede deshacer.`)) return;
+  try {
+    for (const tabla of ['gastos', 'ticket_items', 'gastos_fijos']) {
+      const { error } = await sb.from(tabla).update({ categoria_id: otros.id }).eq('categoria_id', id);
+      if (error) throw new Error(`${tabla}: ${error.message}`);
+    }
+    await sb.from('presupuestos').delete().eq('categoria_id', id);
+    const { error } = await sb.from('categorias').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    alert('No se pudo eliminar la categoría:\n' + err.message);
+    return;
+  }
+  await cargarCategorias();
+  renderCategorias();
+  renderPresupuestos();
+  mostrarToast(`"${cat.nombre}" eliminada`);
+  refrescarTodo();
 }
 
 document.getElementById('add-cat-btn').addEventListener('click', async () => {
