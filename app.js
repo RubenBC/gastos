@@ -1200,6 +1200,60 @@ function abrirDetalleEtiquetaGeneral(etiqueta, data) {
   document.getElementById('modal-categoria-detalle').classList.add('open');
 }
 
+// ---------------- EXPORTAR CSV ----------------
+function csvCelda(v) {
+  const t = String(v ?? '');
+  return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+
+async function exportarCSV(soloPeriodo) {
+  const btns = [document.getElementById('export-periodo-btn'), document.getElementById('export-todo-btn')];
+  btns.forEach((b) => { b.disabled = true; });
+  try {
+    const filas = [];
+    const tamano = 1000;
+    const rango = calcularPeriodo(cursorFecha);
+    for (let desde = 0; ; desde += tamano) {
+      let q = sb.from('gastos').select('*').eq('estado', 'confirmado').order('fecha', { ascending: false }).order('id').range(desde, desde + tamano - 1);
+      if (soloPeriodo) q = q.gte('fecha', rango.inicio).lte('fecha', rango.fin);
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      filas.push(...data);
+      if (data.length < tamano) break;
+    }
+    if (!filas.length) { alert('No hay gastos que exportar.'); return; }
+
+    const lineas = [['Fecha', 'Tipo', 'Comercio', 'Descripción', 'Categoría', 'Importe (€)']];
+    filas.forEach((g) => {
+      let comercio = '', descripcion = g.descripcion || '';
+      if (g.origen === 'ticket' && descripcion.includes(' — ')) {
+        const partes = descripcion.split(' — ');
+        comercio = partes.shift();
+        descripcion = partes.join(' — ');
+      }
+      lineas.push([g.fecha, g.origen, comercio, descripcion, nombreCategoria(g.categoria_id), Number(g.importe).toFixed(2).replace('.', ',')]);
+    });
+    // BOM + separador ';' para que Excel en español lo abra bien
+    const csv = '\uFEFF' + lineas.map((l) => l.map(csvCelda).join(';')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = soloPeriodo ? `gastos-${rango.inicio}_${rango.fin}.csv` : `gastos-historial-${hoyISO()}.csv`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    mostrarToast(`Exportados ${filas.length} gastos`);
+  } catch (err) {
+    alert('No se pudo exportar: ' + err.message);
+  } finally {
+    btns.forEach((b) => { b.disabled = false; });
+  }
+}
+document.getElementById('export-periodo-btn').addEventListener('click', () => exportarCSV(true));
+document.getElementById('export-todo-btn').addEventListener('click', () => exportarCSV(false));
+
 // ---------------- BUSCADOR (pestaña Tickets) ----------------
 let buscarTimer = null;
 const buscarInput = document.getElementById('buscar-input');

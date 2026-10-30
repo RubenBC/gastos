@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.8.4">
+<link rel="manifest" href="./manifest.json?v=4.9.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -404,6 +404,16 @@
       <div id="presupuestos-list"></div>
       <div class="hint-text">Límite por periodo. Déjalo vacío si no quieres límite. Avisa en naranja al 80 % y en rojo al pasarte.</div>
 
+      <div class="section-title">Exportar datos</div>
+      <div class="m3-card">
+        <div class="settings-item-label">Descargar gastos en CSV</div>
+        <div class="settings-item-sub" style="margin-bottom:12px;">Se abre en Excel o Google Sheets. Sirve también como copia de seguridad.</div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn-tonal" id="export-periodo-btn">Este periodo</button>
+          <button class="btn-filled" id="export-todo-btn">Todo el historial</button>
+        </div>
+      </div>
+
       <div class="section-title">Periodo de gasto</div>
       <div class="m3-card">
         <div class="settings-item-label">Reiniciar periodo</div>
@@ -512,7 +522,7 @@
 <div class="toast" id="toast"><span class="toast-msg" id="toast-msg"></span><button class="toast-undo" id="toast-undo">Deshacer</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.8.4"></script>
-<script src="./app.js?v=4.8.4"></script>
+<script src="./config.js?v=4.9.0"></script>
+<script src="./app.js?v=4.9.0"></script>
 </body>
 </html>
