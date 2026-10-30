@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.9.0">
+<link rel="manifest" href="./manifest.json?v=5.0.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -254,6 +254,33 @@
   .cat-chip{display:flex; align-items:center; gap:6px; padding:9px 13px; border-radius:100px; border:1px solid var(--md-outline-variant); background:var(--md-surface-container); color:var(--md-on-surface); font-size:12.5px; font-weight:600; font-family:inherit;}
   .cat-chip.sel{background:var(--md-secondary-container); border-color:transparent; color:var(--md-on-secondary-container);}
 
+  /* ---------- Duplicados, vacíos, swipe, precios ---------- */
+  .dup-banner{background:var(--md-error-container); color:var(--md-on-error-container); border-radius:16px; padding:12px 14px; font-size:12.5px; font-weight:600; line-height:1.45; margin-bottom:12px;}
+  .empty-btn{margin-top:14px; background:var(--md-primary); color:var(--md-on-primary); border:none; border-radius:100px; padding:12px 22px; font-weight:700; font-size:13.5px; font-family:inherit;}
+  .ticket-card{touch-action:pan-y; transition:transform .18s ease, opacity .18s ease;}
+  .donut-hero-wrap{touch-action:pan-y;}
+  .swipe-hint{font-size:10.5px; color:var(--md-on-surface-variant); text-align:center; margin:2px 0 8px; opacity:.7;}
+  .precio-card{background:var(--md-surface-container); border-radius:22px; padding:16px; margin-bottom:12px;}
+  .precio-titulo{font-size:12px; font-weight:700; color:var(--md-primary); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;}
+  .precio-stats{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
+  .precio-stat{background:var(--md-surface-container-high); border-radius:14px; padding:10px 12px;}
+  .precio-stat b{display:block; font-size:15px; color:var(--md-on-surface);}
+  .precio-stat span{font-size:10.5px; color:var(--md-on-surface-variant);}
+
+  /* ---------- Bloqueo ---------- */
+  #lock-screen{position:fixed; inset:0; z-index:200; background:var(--md-background); display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;}
+  .pin-dots{display:flex; gap:16px; justify-content:center; margin:18px 0 22px;}
+  .pin-dot{width:15px; height:15px; border-radius:50%; border:2px solid var(--md-outline); transition:background .1s;}
+  .pin-dot.on{background:var(--md-primary); border-color:var(--md-primary);}
+  .pin-pad{display:grid; grid-template-columns:repeat(3,72px); gap:14px; justify-content:center;}
+  .pin-key{width:72px; height:72px; border-radius:50%; border:none; background:var(--md-surface-container-high); color:var(--md-on-surface); font-size:24px; font-weight:600; font-family:inherit; display:flex; align-items:center; justify-content:center;}
+  .pin-key:active{background:var(--md-secondary-container);}
+  .pin-key.vacio{background:none;}
+  #lock-error{color:var(--md-error); font-size:13px; min-height:20px; margin-top:14px;}
+  .btn-text{background:none; border:none; color:var(--md-on-surface-variant); font-size:12.5px; font-weight:600; padding:12px; font-family:inherit;}
+  .shake{animation:sacudir .3s;}
+  @keyframes sacudir{25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
+
   /* ---------- NAV INFERIOR M3 ---------- */
   .navbar{position:fixed; bottom:0; left:0; right:0; background:var(--md-surface-container); display:flex; padding:10px 8px calc(8px + env(safe-area-inset-bottom)); z-index:21; border-top:1px solid var(--md-outline-variant);}
   .navitem{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 0; border:none; background:none;}
@@ -414,6 +441,32 @@
         </div>
       </div>
 
+      <div class="section-title">Seguridad</div>
+      <div class="m3-card">
+        <div class="settings-item" style="padding:0; background:none; margin-bottom:10px;">
+          <div>
+            <div class="settings-item-label">Bloqueo con PIN</div>
+            <div class="settings-item-sub">Pide un PIN de 4 dígitos al abrir la app</div>
+          </div>
+          <button class="m3-switch off" id="lock-toggle"></button>
+        </div>
+        <div id="lock-opciones" style="display:none; gap:10px; flex-wrap:wrap;">
+          <button class="btn-tonal" id="lock-cambiar" style="flex:1;">Cambiar PIN</button>
+          <button class="btn-tonal" id="lock-huella" style="flex:1;">Activar huella</button>
+        </div>
+        <div class="hint-text">El bloqueo protege la app en este móvil. No cifra los datos, y si borras los datos del navegador se desactiva.</div>
+      </div>
+
+      <div class="section-title">Mantenimiento</div>
+      <div class="m3-card">
+        <div class="settings-item-label">Ordenar datos antiguos</div>
+        <div class="settings-item-sub" style="margin-bottom:12px;">Unifica los nombres de comercio (Mercadona, Dia…) y mueve a "Moto" los gastos de la moto, el seguro y la gasolina.</div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn-tonal" id="mant-comercios">Unificar comercios</button>
+          <button class="btn-tonal" id="mant-moto">Ordenar Moto</button>
+        </div>
+      </div>
+
       <div class="section-title">Periodo de gasto</div>
       <div class="m3-card">
         <div class="settings-item-label">Reiniciar periodo</div>
@@ -519,10 +572,20 @@
   </div>
 </div>
 
+<div id="lock-screen">
+  <div class="login-title">Gastos</div>
+  <div class="login-sub" id="lock-sub">Introduce tu PIN</div>
+  <div class="pin-dots" id="pin-dots"></div>
+  <div class="pin-pad" id="pin-pad"></div>
+  <div id="lock-error"></div>
+  <button class="btn-text" id="lock-cancelar" style="display:none;">Cancelar</button>
+  <button class="btn-text" id="lock-forgot" style="display:none;">¿Olvidaste el PIN? Cerrar sesión</button>
+</div>
+
 <div class="toast" id="toast"><span class="toast-msg" id="toast-msg"></span><button class="toast-undo" id="toast-undo">Deshacer</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.9.0"></script>
-<script src="./app.js?v=4.9.0"></script>
+<script src="./config.js?v=5.0.0"></script>
+<script src="./app.js?v=5.0.0"></script>
 </body>
 </html>

@@ -8,7 +8,8 @@ const CAT_COLORS = {
   'alimentación': '#9FCB8E', 'higiene personal': '#8FCBBE', 'limpieza': '#8EB8CB',
   'vivienda': '#CBB68E', 'transporte': '#CBAF8E', 'salud': '#CB8E9F',
   'ocio': '#B08ECB', 'compras': '#CBC28E', 'otros': '#A9A99A',
-  'préstamos': '#8E9ECB',
+  'préstamos': '#8E9ECB', 'prestamos': '#8E9ECB',
+  'moto': '#D39B7C', 'cerveza': '#D8B35A', 'loteria': '#7FC4A3', 'lotería': '#7FC4A3', 'gasolina': '#C98F8F',
 };
 // Paleta de respaldo para categorías personalizadas que el usuario añada,
 // con más colores de los que hacen falta para evitar que se repitan
@@ -35,6 +36,12 @@ function iconoSVG(nombre, size) {
   const path = ICONOS_SVG[(nombre || '').toLowerCase()] || '<circle cx="12" cy="12" r="8"/>';
   return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 }
+ICONOS_SVG['prestamos'] = ICONOS_SVG['préstamos'];
+ICONOS_SVG['moto'] = '<circle cx="6" cy="16.5" r="3"/><circle cx="18" cy="16.5" r="3"/><path d="M6 16.5l3-6h5l3 6"/><path d="M14 10.5l-1-3h-2"/><path d="M9 10.5h5"/>';
+ICONOS_SVG['cerveza'] = '<path d="M6 8h9v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/><path d="M15 10h2.2a1.8 1.8 0 0 1 1.8 1.8v1.4a1.8 1.8 0 0 1-1.8 1.8H15"/><path d="M8 5c0-1 1-1.5 2-1.5s1.2.5 2 .5 1.5-.5 2.5 0"/>';
+ICONOS_SVG['loteria'] = '<circle cx="9" cy="9" r="3"/><circle cx="15" cy="9" r="3"/><circle cx="9" cy="15" r="3"/><circle cx="15" cy="15" r="3"/><path d="M12 12l5 8"/>';
+ICONOS_SVG['lotería'] = ICONOS_SVG['loteria'];
+ICONOS_SVG['gasolina'] = '<path d="M5 20V5a1.5 1.5 0 0 1 1.5-1.5h6A1.5 1.5 0 0 1 14 5v15"/><path d="M4 20h11"/><path d="M7 7h6"/><path d="M14 9h2a1.5 1.5 0 0 1 1.5 1.5v5a1.2 1.2 0 0 0 2.4 0V9l-2-2"/>';
 const ICONO_RECIBO = '<path d="M6 3h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 8h6M9 11h6M9 14h3.5"/>';
 const ICONO_PAPELERA = '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>';
 function svgInline(pathInner, size, strokeWidth) {
@@ -83,6 +90,18 @@ let nominaEsteMesId = null;
 let chartCategorias = null;
 let periodosCache = []; // fechas de inicio de cada reinicio manual, ordenadas
 let cursorFecha = hoyISO(); // fecha de referencia: qué periodo se está mirando ahora mismo
+
+// ---------------- NORMALIZAR COMERCIO ----------------
+function normalizarComercio(nombre) {
+  let n = (nombre || '').trim();
+  if (!n || /^(desconocido|comercio desconocido|supermercado|sin nombre)$/i.test(n)) return 'Sin nombre';
+  const bajo = n.toLowerCase();
+  const conocidos = [['mercadona', 'Mercadona'], ['grupo dia', 'Dia'], ['alcampo', 'Alcampo'], ['primaprix', 'Primaprix'], ['lidl', 'Lidl'], ['carrefour', 'Carrefour'], ['amazon', 'Amazon']];
+  for (const [k, v] of conocidos) if (bajo.includes(k)) return v;
+  n = n.replace(/[,\s]+(s\.?\s?a\.?(\s?u\.?)?|s\.?\s?l\.?(\s?u\.?)?|a\.s\.a\.?)\.?$/i, '').trim();
+  if (n === n.toUpperCase()) n = n.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+  return n;
+}
 
 // ---------------- TOAST CON DESHACER ----------------
 let toastTimer = null;
@@ -192,8 +211,10 @@ function poblarSelectCategorias(sel, categoriaIdActual) {
 // ---------------- AUTH ----------------
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
-  if (session && session.user?.email === CONFIG.ADMIN_EMAIL) mostrarApp();
-  else document.getElementById('login-screen').style.display = 'flex';
+  if (session && session.user?.email === CONFIG.ADMIN_EMAIL) {
+    if (bloqueoActivo()) mostrarLock('unlock', () => mostrarApp(), { autoHuella: true });
+    else mostrarApp();
+  } else document.getElementById('login-screen').style.display = 'flex';
 }
 
 document.getElementById('login-btn').addEventListener('click', async () => {
@@ -241,6 +262,176 @@ document.getElementById('tema-toggle').addEventListener('click', () => {
   if (document.getElementById('view-resumen').classList.contains('active')) cargarDashboard();
 });
 
+// ---------------- BLOQUEO CON PIN / HUELLA ----------------
+const LOCK_KEY = 'gastos-lock';
+let suspenderBloqueo = false;
+let ocultoDesde = 0;
+let lockState = { modo: 'unlock', pin: '', primero: '', cb: null, fallos: 0, bloqueadoHasta: 0 };
+
+function leerLock() { try { return JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch (e) { return null; } }
+function guardarLock(o) { try { if (o) localStorage.setItem(LOCK_KEY, JSON.stringify(o)); else localStorage.removeItem(LOCK_KEY); } catch (e) {} }
+function bloqueoActivo() { const l = leerLock(); return !!(l && l.hash); }
+async function hashPin(pin, salt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + ':' + pin));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+const aB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const deB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+(function construirTeclado() {
+  const pad = document.getElementById('pin-pad');
+  const huellaSVG = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 11v3.5a6 6 0 0 1-1.5 4"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0v2.5a9 9 0 0 1-1.2 4.2"/><path d="M5.5 12a6.5 6.5 0 0 1 13 0v1.5"/><path d="M8.5 15v.5a6 6 0 0 1-1 3"/></svg>';
+  pad.innerHTML = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<button class="pin-key" data-k="${n}">${n}</button>`).join('')
+    + `<button class="pin-key vacio" id="pin-huella" style="display:none;">${huellaSVG}</button><button class="pin-key" data-k="0">0</button><button class="pin-key vacio" id="pin-borrar">⌫</button>`;
+  pad.querySelectorAll('[data-k]').forEach((b) => b.addEventListener('click', () => pulsarTecla(b.dataset.k)));
+  document.getElementById('pin-borrar').addEventListener('click', () => { lockState.pin = lockState.pin.slice(0, -1); actualizarLockUI(); });
+  document.getElementById('pin-huella').addEventListener('click', intentarHuella);
+  document.getElementById('pin-dots').innerHTML = '<span class="pin-dot"></span>'.repeat(4);
+})();
+
+function mostrarLock(modo, cb, opts = {}) {
+  lockState = { ...lockState, modo, pin: '', primero: '', cb, cancelable: !!opts.cancelable };
+  document.getElementById('lock-screen').style.display = 'flex';
+  document.getElementById('lock-error').textContent = '';
+  actualizarLockUI();
+  if ((modo === 'unlock' || modo === 'verify') && opts.autoHuella) intentarHuella();
+}
+function cerrarLock() { document.getElementById('lock-screen').style.display = 'none'; }
+
+function actualizarLockUI() {
+  const { modo, pin, primero, cancelable } = lockState;
+  const textos = { unlock: 'Introduce tu PIN', verify: 'Introduce tu PIN actual', setup: primero ? 'Repite el PIN' : 'Crea un PIN de 4 dígitos' };
+  document.getElementById('lock-sub').textContent = textos[modo];
+  document.querySelectorAll('#pin-dots .pin-dot').forEach((d, i) => d.classList.toggle('on', i < pin.length));
+  document.getElementById('lock-cancelar').style.display = cancelable ? 'block' : 'none';
+  document.getElementById('lock-forgot').style.display = modo === 'unlock' ? 'block' : 'none';
+  const l = leerLock();
+  document.getElementById('pin-huella').style.display = (l?.cred && modo !== 'setup') ? 'flex' : 'none';
+}
+
+function errorLock(msg) {
+  const el = document.getElementById('lock-error');
+  el.textContent = msg;
+  const dots = document.getElementById('pin-dots');
+  dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake');
+  vibrar();
+  lockState.pin = '';
+  actualizarLockUI();
+}
+
+function pulsarTecla(d) {
+  if (Date.now() < lockState.bloqueadoHasta) { errorLock('Demasiados intentos. Espera unos segundos.'); return; }
+  if (lockState.pin.length >= 4) return;
+  document.getElementById('lock-error').textContent = '';
+  lockState.pin += d;
+  actualizarLockUI();
+  if (lockState.pin.length === 4) setTimeout(procesarPin, 120);
+}
+
+async function procesarPin() {
+  const { modo, pin } = lockState;
+  if (modo === 'unlock' || modo === 'verify') {
+    const l = leerLock();
+    const h = l ? await hashPin(pin, l.salt) : null;
+    if (l && h === l.hash) {
+      lockState.fallos = 0;
+      cerrarLock();
+      if (lockState.cb) lockState.cb();
+    } else {
+      lockState.fallos++;
+      if (lockState.fallos >= 5) { lockState.bloqueadoHasta = Date.now() + 15000; lockState.fallos = 0; errorLock('Demasiados intentos. Espera 15 segundos.'); }
+      else errorLock('PIN incorrecto');
+    }
+    return;
+  }
+  // setup
+  if (!lockState.primero) { lockState.primero = pin; lockState.pin = ''; actualizarLockUI(); return; }
+  if (pin !== lockState.primero) { lockState.primero = ''; errorLock('Los PIN no coinciden. Empieza de nuevo.'); return; }
+  const salt = aB64(crypto.getRandomValues(new Uint8Array(16)));
+  const previo = leerLock() || {};
+  guardarLock({ ...previo, salt, hash: await hashPin(pin, salt) });
+  cerrarLock();
+  if (lockState.cb) lockState.cb();
+}
+
+async function intentarHuella() {
+  const l = leerLock();
+  if (!l?.cred || !window.PublicKeyCredential) return;
+  try {
+    await navigator.credentials.get({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ id: deB64(l.cred), type: 'public-key', transports: ['internal'] }],
+      userVerification: 'required', timeout: 60000,
+    } });
+    lockState.fallos = 0;
+    cerrarLock();
+    if (lockState.cb) lockState.cb();
+  } catch (e) { /* cancelada o fallida: sigue disponible el PIN */ }
+}
+
+async function activarHuella() {
+  if (!window.PublicKeyCredential) { alert('Este navegador no permite huella.'); return; }
+  try {
+    const cred = await navigator.credentials.create({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name: 'Gastos' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'gastos', displayName: 'Gastos' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+      timeout: 60000,
+    } });
+    guardarLock({ ...leerLock(), cred: aB64(cred.rawId) });
+    renderBloqueoAjustes();
+    mostrarToast('Huella activada');
+  } catch (e) {
+    alert('No se pudo activar la huella: ' + (e.message || e.name));
+  }
+}
+
+function renderBloqueoAjustes() {
+  const activo = bloqueoActivo();
+  const l = leerLock();
+  document.getElementById('lock-toggle').classList.toggle('off', !activo);
+  document.getElementById('lock-opciones').style.display = activo ? 'flex' : 'none';
+  const bh = document.getElementById('lock-huella');
+  bh.style.display = window.PublicKeyCredential ? '' : 'none';
+  bh.textContent = l?.cred ? 'Quitar huella' : 'Activar huella';
+}
+
+document.getElementById('lock-toggle').addEventListener('click', () => {
+  if (!bloqueoActivo()) {
+    mostrarLock('setup', () => { renderBloqueoAjustes(); mostrarToast('Bloqueo activado'); }, { cancelable: true });
+  } else {
+    mostrarLock('verify', () => { guardarLock(null); renderBloqueoAjustes(); mostrarToast('Bloqueo desactivado'); }, { cancelable: true });
+  }
+});
+document.getElementById('lock-cambiar').addEventListener('click', () => {
+  mostrarLock('verify', () => mostrarLock('setup', () => mostrarToast('PIN cambiado'), { cancelable: true }), { cancelable: true });
+});
+document.getElementById('lock-huella').addEventListener('click', () => {
+  const l = leerLock();
+  if (l?.cred) { const { cred, ...resto } = l; guardarLock(resto); renderBloqueoAjustes(); mostrarToast('Huella quitada'); }
+  else activarHuella();
+});
+document.getElementById('lock-cancelar').addEventListener('click', () => { cerrarLock(); renderBloqueoAjustes(); });
+document.getElementById('lock-forgot').addEventListener('click', async () => {
+  if (!confirm('Se cerrará la sesión y se quitará el bloqueo. Tendrás que entrar de nuevo con tu contraseña. ¿Seguir?')) return;
+  guardarLock(null);
+  await sb.auth.signOut();
+  location.reload();
+});
+
+// Bloquear de nuevo al volver a la app tras un rato en segundo plano
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { ocultoDesde = Date.now(); return; }
+  if (suspenderBloqueo) { suspenderBloqueo = false; return; }
+  const appVisible = document.getElementById('app').style.display === 'flex';
+  const yaBloqueada = document.getElementById('lock-screen').style.display === 'flex';
+  if (appVisible && !yaBloqueada && bloqueoActivo() && ocultoDesde && Date.now() - ocultoDesde > 90000) {
+    mostrarLock('unlock', null, { autoHuella: true });
+  }
+});
+
 // ---------------- NAVEGACIÓN ----------------
 document.querySelectorAll('.navitem').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -250,7 +441,7 @@ document.querySelectorAll('.navitem').forEach((btn) => {
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if (btn.dataset.view === 'resumen') cargarDashboard();
     if (btn.dataset.view === 'tickets') cargarTickets();
-    if (btn.dataset.view === 'ajustes') { cargarNominaConfig(); cargarFijosConfig(); renderCategorias(); renderPresupuestos(); }
+    if (btn.dataset.view === 'ajustes') { cargarNominaConfig(); cargarFijosConfig(); renderCategorias(); renderPresupuestos(); renderBloqueoAjustes(); }
   });
 });
 
@@ -513,10 +704,11 @@ document.getElementById('fijo-borrar').addEventListener('click', async () => {
 });
 
 // ---------------- BOTTOM SHEET (＋) ----------------
+document.addEventListener('click', (e) => { if (e.target.closest('[data-abrir-sheet]')) document.getElementById('sheet-add').classList.add('open'); });
 document.getElementById('fab-add').addEventListener('click', () => document.getElementById('sheet-add').classList.add('open'));
 document.getElementById('sheet-add').addEventListener('click', (e) => { if (e.target.id === 'sheet-add') e.currentTarget.classList.remove('open'); });
-document.getElementById('sheet-camara').addEventListener('click', () => { document.getElementById('sheet-add').classList.remove('open'); document.getElementById('file-input').click(); });
-document.getElementById('sheet-galeria').addEventListener('click', () => { document.getElementById('sheet-add').classList.remove('open'); document.getElementById('file-input-gallery').click(); });
+document.getElementById('sheet-camara').addEventListener('click', () => { suspenderBloqueo = true; document.getElementById('sheet-add').classList.remove('open'); document.getElementById('file-input').click(); });
+document.getElementById('sheet-galeria').addEventListener('click', () => { suspenderBloqueo = true; document.getElementById('sheet-add').classList.remove('open'); document.getElementById('file-input-gallery').click(); });
 document.getElementById('sheet-manual').addEventListener('click', () => { document.getElementById('sheet-add').classList.remove('open'); abrirModalManual(); });
 
 document.getElementById('file-input').addEventListener('change', (e) => procesarFotoTicket(e));
@@ -603,6 +795,36 @@ function renderRevisarModal() {
   document.getElementById('btn-descartar').addEventListener('click', descartarTicket);
   document.getElementById('btn-conformar').addEventListener('click', conformarTicket);
   document.getElementById('modal-revisar').classList.add('open');
+
+  // Aviso de posible duplicado (se comprueba en segundo plano)
+  buscarDuplicado(ticket, items).then((dup) => {
+    if (!dup || ticketActual?.ticket.id !== ticket.id) return;
+    const aviso = document.createElement('div');
+    aviso.className = 'dup-banner';
+    aviso.textContent = `Posible duplicado: ya tienes un ticket de ${dup.comercio || 'este comercio'} del ${new Date(dup.fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} por ${euros(dup.importe_total)}. Si es el mismo, descártalo.`;
+    box.insertBefore(aviso, box.querySelector('.ticket-preview'));
+    const btn = document.getElementById('btn-conformar');
+    if (btn) btn.textContent = 'Guardar igualmente';
+  }).catch(() => {});
+}
+
+function normItem(s) { return (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, ''); }
+
+async function buscarDuplicado(ticket, items) {
+  const { data: cands } = await sb.from('tickets').select('id, comercio, fecha, importe_total').eq('estado', 'confirmado')
+    .gte('fecha', addDias(ticket.fecha, -3)).lte('fecha', addDias(ticket.fecha, 3)).neq('id', ticket.id);
+  if (!cands || !cands.length) return null;
+  const nuevos = items.map((i) => normItem(i.nombre_articulo));
+  const total = items.reduce((a, i) => a + Number(i.precio_total || 0), 0);
+  for (const c of cands) {
+    const mismoTotal = total > 0 && Math.abs(Number(c.importe_total) - total) < 0.02;
+    const { data: gs } = await sb.from('gastos').select('descripcion').eq('ticket_id', c.id);
+    const existentes = (gs || []).map((g) => normItem(g.descripcion.split(' — ').slice(1).join(' — ')));
+    const comunes = nuevos.filter((n) => existentes.includes(n)).length;
+    const solape = nuevos.length ? comunes / nuevos.length : 0;
+    if (c.fecha === ticket.fecha ? (mismoTotal || solape >= 0.7) : (mismoTotal && solape >= 0.5)) return c;
+  }
+  return null;
 }
 
 async function cargarPendientes() {
@@ -668,7 +890,7 @@ async function conformarTicket() {
     precio: parseFloat(row.querySelector('[data-field="precio_total"]').textContent.replace(',', '.')) || 0,
     categoriaId: row.querySelector('[data-field="categoria_id"]').value,
   }));
-  const comercio = document.getElementById('edit-comercio').value.trim();
+  const comercio = normalizarComercio(document.getElementById('edit-comercio').value);
   const totalFinal = itemsEditados.reduce((a, i) => a + i.precio, 0);
 
   if (itemsEditados.length === 0) {
@@ -794,13 +1016,10 @@ document.getElementById('manual-guardar').addEventListener('click', async () => 
   refrescarTodo();
 });
 
-document.getElementById('manual-borrar').addEventListener('click', async () => {
-  if (!modalManualEditId) return;
-  const id = modalManualEditId;
+async function borrarGastoConDeshacer(id) {
   const { data: fila } = await sb.from('gastos').select('*').eq('id', id).single();
   const { error } = await sb.from('gastos').delete().eq('id', id);
-  if (error) { alert('No se pudo borrar: ' + error.message); return; }
-  document.getElementById('modal-manual').classList.remove('open');
+  if (error) { alert('No se pudo borrar: ' + error.message); return false; }
   vibrar();
   refrescarTodo();
   mostrarToast('Gasto borrado', async () => {
@@ -809,6 +1028,13 @@ document.getElementById('manual-borrar').addEventListener('click', async () => {
     if (r.error) { alert('No se pudo restaurar: ' + r.error.message); return; }
     refrescarTodo();
   });
+  return true;
+}
+
+document.getElementById('manual-borrar').addEventListener('click', async () => {
+  if (!modalManualEditId) return;
+  document.getElementById('modal-manual').classList.remove('open');
+  await borrarGastoConDeshacer(modalManualEditId);
 });
 
 function editarGasto(row) {
@@ -1042,7 +1268,7 @@ function dibujarDonut(porCategoria, prevPorCategoria = {}) {
       </div>
       <div class="legend-amt">${euros(importe)}</div>
     </div>
-  `).join('') || '<div class="empty-state" style="padding:0;">Sin gastos este periodo.</div>';
+  `).join('') || '<div class="empty-state" style="padding:8px 0;">Sin gastos en este periodo.<br><button class="empty-btn" data-abrir-sheet>＋ Añadir gasto</button></div>';
 
   legend.querySelectorAll('.legend-row').forEach((row) => {
     row.addEventListener('click', () => abrirDetalleCategoria(row.dataset.nombre));
@@ -1132,7 +1358,7 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
         </div>
       </div>
     `;
-  }).join('') || '<div class="empty-state">Sin movimientos este mes todavía.</div>';
+  }).join('') || `<div class="empty-state">Aún no hay movimientos en este periodo.<br>Escanea un ticket o apunta un gasto.<br><button class="empty-btn" data-abrir-sheet>＋ Añadir</button></div>`;
 
   cont.querySelectorAll('.ticket-card-header').forEach((h) => {
     h.addEventListener('click', (evt) => {
@@ -1144,6 +1370,58 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
   cont.querySelectorAll('.ticket-delete-btn').forEach((btn) => btn.addEventListener('click', (e) => { e.stopPropagation(); borrarTicketCompleto(btn.dataset.ticketId); }));
   cont.querySelectorAll('.ticket-item-row').forEach((row) => row.addEventListener('click', (e) => { e.stopPropagation(); editarGasto(row); }));
 }
+
+// ---------------- DESLIZAR (borrar movimiento / cambiar de periodo) ----------------
+function activarSwipeBorrar(cont) {
+  let card = null, x0 = 0, y0 = 0, dx = 0, activo = false;
+  cont.addEventListener('touchstart', (e) => {
+    const c = e.target.closest('.ticket-card');
+    if (!c || e.touches.length !== 1) { card = null; return; }
+    card = c; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; activo = false;
+    card.style.transition = 'none';
+  }, { passive: true });
+  cont.addEventListener('touchmove', (e) => {
+    if (!card) return;
+    const t = e.touches[0];
+    const ddx = t.clientX - x0, ddy = t.clientY - y0;
+    if (!activo) {
+      if (Math.abs(ddx) > 12 && Math.abs(ddx) > Math.abs(ddy) * 1.5) activo = true;
+      else if (Math.abs(ddy) > 12) { card.style.transition = ''; card = null; return; }
+    }
+    if (activo) {
+      dx = Math.min(0, ddx);
+      card.style.transform = `translateX(${dx}px)`;
+      card.style.opacity = String(1 - Math.min(0.6, Math.abs(dx) / 300));
+    }
+  }, { passive: true });
+  cont.addEventListener('touchend', async () => {
+    if (!card) return;
+    const c = card; card = null;
+    c.style.transition = '';
+    const reset = () => { c.style.transform = ''; c.style.opacity = ''; };
+    if (!activo || dx > -110) { reset(); return; }
+    const ticketId = c.dataset.ticketId;
+    const gastoId = c.querySelector('.ticket-card-header[data-gasto-id]')?.dataset.gastoId;
+    if (ticketId) await borrarTicketCompleto(ticketId);
+    else if (gastoId) await borrarGastoConDeshacer(gastoId);
+    reset();
+  });
+}
+activarSwipeBorrar(document.getElementById('movimientos-list'));
+activarSwipeBorrar(document.getElementById('tickets-detalle'));
+
+(function swipePeriodo() {
+  const zona = document.querySelector('.donut-hero-wrap');
+  let x0 = 0, y0 = 0;
+  zona.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  zona.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const btn = document.getElementById(dx > 0 ? 'mes-anterior' : 'mes-siguiente');
+    if (!btn.disabled) btn.click();
+  }, { passive: true });
+})();
 
 // ---------------- TICKETS (pestaña) ----------------
 const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Otros'];
@@ -1199,6 +1477,78 @@ function abrirDetalleEtiquetaGeneral(etiqueta, data) {
   });
   document.getElementById('modal-categoria-detalle').classList.add('open');
 }
+
+// ---------------- MANTENIMIENTO (datos antiguos) ----------------
+async function unificarComerciosAntiguos() {
+  if (!confirm('Se unificarán los nombres de comercio de tus tickets (por ejemplo "MERCADONA, S.A." → "Mercadona"). ¿Seguir?')) return;
+  const btn = document.getElementById('mant-comercios');
+  btn.disabled = true;
+  try {
+    const { data: tks, error } = await sb.from('tickets').select('id, comercio');
+    if (error) throw new Error(error.message);
+    let cambiados = 0;
+    for (const t of tks) {
+      const nuevo = normalizarComercio(t.comercio);
+      if (nuevo === t.comercio) continue;
+      const r = await sb.from('tickets').update({ comercio: nuevo }).eq('id', t.id);
+      if (r.error) throw new Error(r.error.message);
+      const { data: gs } = await sb.from('gastos').select('id, descripcion').eq('ticket_id', t.id);
+      for (const g of gs || []) {
+        if (g.descripcion.startsWith(t.comercio + ' — ')) {
+          await sb.from('gastos').update({ descripcion: nuevo + g.descripcion.slice(t.comercio.length) }).eq('id', g.id);
+        }
+      }
+      cambiados++;
+    }
+    mostrarToast(cambiados ? `${cambiados} tickets unificados` : 'Ya estaba todo unificado');
+    refrescarTodo();
+  } catch (err) {
+    alert('No se pudo unificar: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function ordenarMoto() {
+  if (!confirm('Se moverán a la categoría "Moto" los gastos cuya descripción incluya moto, gasolina, intercomunicador, guantes, candado o revisión de la moto, y los gastos fijos de la moto. ¿Seguir?')) return;
+  const btn = document.getElementById('mant-moto');
+  btn.disabled = true;
+  try {
+    let moto = categoriasCache.find((c) => c.nombre.toLowerCase() === 'moto');
+    if (!moto) {
+      const { error } = await sb.from('categorias').insert({ nombre: 'Moto', orden: categoriasCache.length + 1 });
+      if (error) throw new Error(error.message);
+      await cargarCategorias();
+      moto = categoriasCache.find((c) => c.nombre.toLowerCase() === 'moto');
+    }
+    const patron = /moto|gasolin|intercomunicador|guante unik|candado|revisi[oó]n 1000/i;
+    const ids = [];
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await sb.from('gastos').select('id, descripcion, categoria_id').order('id').range(desde, desde + 999);
+      if (error) throw new Error(error.message);
+      data.forEach((g) => { if (patron.test(g.descripcion) && g.categoria_id !== moto.id) ids.push(g.id); });
+      if (data.length < 1000) break;
+    }
+    for (let k = 0; k < ids.length; k += 100) {
+      const { error } = await sb.from('gastos').update({ categoria_id: moto.id }).in('id', ids.slice(k, k + 100));
+      if (error) throw new Error(error.message);
+    }
+    const { data: fijos } = await sb.from('gastos_fijos').select('id, nombre');
+    for (const f of fijos || []) {
+      if (/moto/i.test(f.nombre)) await sb.from('gastos_fijos').update({ categoria_id: moto.id }).eq('id', f.id);
+    }
+    await cargarCategorias();
+    renderCategorias();
+    mostrarToast(`${ids.length} gastos movidos a Moto`);
+    refrescarTodo();
+  } catch (err) {
+    alert('No se pudo ordenar: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+document.getElementById('mant-comercios').addEventListener('click', unificarComerciosAntiguos);
+document.getElementById('mant-moto').addEventListener('click', ordenarMoto);
 
 // ---------------- EXPORTAR CSV ----------------
 function csvCelda(v) {
@@ -1305,6 +1655,45 @@ async function ejecutarBusqueda() {
       }).join('')
     : '<div class="empty-state">No hay gastos que coincidan.</div>';
   res.querySelectorAll('.search-res-row').forEach((row) => row.addEventListener('click', () => editarGasto(row)));
+  dibujarPrecios(q, data || []);
+}
+
+let chartPrecio = null;
+function dibujarPrecios(q, data) {
+  if (chartPrecio) { chartPrecio.destroy(); chartPrecio = null; }
+  const qn = normItem(q);
+  const lineas = data.filter((g) => g.origen === 'ticket' && normItem(g.descripcion.split(' — ').slice(1).join(' — ')).includes(qn))
+    .sort((x, y) => (x.fecha < y.fecha ? -1 : 1));
+  if (lineas.length < 2) return;
+  const imps = lineas.map((g) => Number(g.importe));
+  const min = Math.min(...imps), max = Math.max(...imps);
+  const media = imps.reduce((s, v) => s + v, 0) / imps.length;
+  const ultima = lineas[lineas.length - 1];
+  const gMin = lineas[imps.indexOf(min)];
+  const comercioDe = (g) => g.descripcion.split(' — ')[0];
+  const fmt = (f) => new Date(f + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+  const card = document.createElement('div');
+  card.className = 'precio-card';
+  card.innerHTML = `
+    <div class="precio-titulo">Precio de «${q}» · ${lineas.length} compras</div>
+    <div class="precio-stats">
+      <div class="precio-stat"><b>${euros(ultima.importe)}</b><span>Última (${fmt(ultima.fecha)})</span></div>
+      <div class="precio-stat"><b>${euros(media)}</b><span>Media</span></div>
+      <div class="precio-stat"><b>${euros(min)}</b><span>Más barato (${comercioDe(gMin)}, ${fmt(gMin.fecha)})</span></div>
+      <div class="precio-stat"><b>${euros(max)}</b><span>Más caro</span></div>
+    </div>
+    <div style="position:relative; height:120px;"><canvas id="chart-precio"></canvas></div>
+    <div class="hint-text">Importe por línea del ticket: si compraste varias unidades, sale el total.</div>`;
+  const res = document.getElementById('buscar-resultados');
+  res.insertBefore(card, res.children[1] || null);
+  try {
+    chartPrecio = new Chart(document.getElementById('chart-precio'), {
+      type: 'line',
+      data: { labels: lineas.map((g) => fmt(g.fecha)), datasets: [{ data: imps, borderColor: '#8FCB86', backgroundColor: '#8FCB8633', fill: true, tension: 0.25, pointRadius: 3 }] },
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { displayColors: false, callbacks: { label: (c) => euros(c.raw) } } },
+        scales: { x: { ticks: { maxTicksLimit: 5, color: '#8A9683' }, grid: { display: false } }, y: { ticks: { color: '#8A9683', callback: (v) => v + ' €' }, grid: { color: '#3D4A3F55' } } } },
+    });
+  } catch (err) { console.error(err); }
 }
 
 // ---------------- ARRANQUE ----------------
