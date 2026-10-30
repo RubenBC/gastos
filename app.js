@@ -76,12 +76,38 @@ function hoyISO() { const d = new Date(); return fechaLocal(d.getFullYear(), d.g
 function nombreCategoria(id) { return categoriasCache.find((c) => c.id === id)?.nombre || 'Otros'; }
 
 let categoriasCache = [];
+let presupuestosCache = {}; // categoria_id -> límite
 let ticketActual = null;
 let modalManualEditId = null;
 let nominaEsteMesId = null;
 let chartCategorias = null;
 let periodosCache = []; // fechas de inicio de cada reinicio manual, ordenadas
 let cursorFecha = hoyISO(); // fecha de referencia: qué periodo se está mirando ahora mismo
+
+// ---------------- TOAST CON DESHACER ----------------
+let toastTimer = null;
+let toastUndoFn = null;
+function mostrarToast(msg, onUndo) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  const btn = document.getElementById('toast-undo');
+  toastUndoFn = onUndo || null;
+  btn.style.display = onUndo ? '' : 'none';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('show'); toastUndoFn = null; }, onUndo ? 7000 : 2500);
+}
+document.getElementById('toast-undo').addEventListener('click', async () => {
+  const fn = toastUndoFn;
+  toastUndoFn = null;
+  document.getElementById('toast').classList.remove('show');
+  if (fn) await fn();
+});
+function vibrar() { try { navigator.vibrate && navigator.vibrate(15); } catch (e) {} }
+function refrescarTodo() {
+  cargarDashboard();
+  if (document.getElementById('view-tickets').classList.contains('active')) { cargarTickets(); ejecutarBusqueda(); }
+}
 
 function addDias(fechaISO, n) {
   const d = new Date(fechaISO + 'T00:00:00');
@@ -223,7 +249,7 @@ document.querySelectorAll('.navitem').forEach((btn) => {
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if (btn.dataset.view === 'resumen') cargarDashboard();
     if (btn.dataset.view === 'tickets') cargarTickets();
-    if (btn.dataset.view === 'ajustes') { cargarNominaConfig(); cargarFijosConfig(); renderCategorias(); }
+    if (btn.dataset.view === 'ajustes') { cargarNominaConfig(); cargarFijosConfig(); renderCategorias(); renderPresupuestos(); }
   });
 });
 
@@ -233,6 +259,40 @@ async function cargarCategorias() {
   if (error) { alert('No se pudieron cargar las categorías: ' + error.message); return; }
   categoriasCache = data;
   asignarColores();
+  await cargarPresupuestos();
+}
+
+async function cargarPresupuestos() {
+  const { data, error } = await sb.from('presupuestos').select('categoria_id, limite');
+  presupuestosCache = {};
+  if (error) return; // la tabla aún no existe: la app sigue funcionando sin presupuestos
+  (data || []).forEach((p) => { presupuestosCache[p.categoria_id] = Number(p.limite); });
+}
+
+function renderPresupuestos() {
+  const cont = document.getElementById('presupuestos-list');
+  cont.innerHTML = categoriasCache.filter((c) => c.activa).map((c) => `
+    <div class="bud-row">
+      <div class="cat-icon-circ" style="background:${colorCategoria(c.nombre)}33; color:${colorCategoria(c.nombre)};">${iconoCategoria(c.nombre)}</div>
+      <div class="cat-name">${c.nombre}</div>
+      <input type="number" inputmode="decimal" step="1" min="0" placeholder="Sin límite" data-cat-id="${c.id}" value="${presupuestosCache[c.id] || ''}">
+    </div>
+  `).join('');
+  cont.querySelectorAll('input').forEach((inp) => {
+    inp.addEventListener('change', async () => {
+      const limite = parseFloat(inp.value);
+      let error;
+      if (limite > 0) {
+        ({ error } = await sb.from('presupuestos').upsert({ categoria_id: inp.dataset.catId, limite }));
+        if (!error) presupuestosCache[inp.dataset.catId] = limite;
+      } else {
+        ({ error } = await sb.from('presupuestos').delete().eq('categoria_id', inp.dataset.catId));
+        if (!error) delete presupuestosCache[inp.dataset.catId];
+      }
+      if (error) { alert('No se pudo guardar el presupuesto (¿has ejecutado anadir-presupuestos.sql?):\n' + error.message); return; }
+      mostrarToast('Presupuesto guardado');
+    });
+  });
 }
 
 function renderCategorias() {
@@ -412,11 +472,14 @@ document.getElementById('fijo-guardar').addEventListener('click', async () => {
 
 document.getElementById('fijo-borrar').addEventListener('click', async () => {
   const fijoId = document.getElementById('modal-fijo').dataset.fijoId;
-  if (!confirm('¿Borrar este gasto fijo? Los pagos ya registrados de meses anteriores se mantienen, pero dejará de aparecer en la lista y no se volverá a pedir.')) return;
   const { error } = await sb.from('gastos_fijos').update({ activo: false }).eq('id', fijoId);
   if (error) { alert('No se pudo borrar: ' + error.message); return; }
   document.getElementById('modal-fijo').classList.remove('open');
   cargarFijosConfig();
+  mostrarToast('Gasto fijo borrado', async () => {
+    await sb.from('gastos_fijos').update({ activo: true }).eq('id', fijoId);
+    cargarFijosConfig();
+  });
 });
 
 // ---------------- BOTTOM SHEET (＋) ----------------
@@ -600,6 +663,8 @@ async function conformarTicket() {
 
     ticketActual = null;
     document.getElementById('modal-revisar').classList.remove('open');
+    vibrar();
+    mostrarToast('Ticket guardado · ' + euros(totalFinal));
     cargarDashboard();
     cargarPendientes();
   } catch (err) {
@@ -608,17 +673,53 @@ async function conformarTicket() {
 }
 
 async function borrarTicketCompleto(ticketId) {
-  if (!confirm('¿Borrar este ticket entero? No se puede deshacer.')) return;
+  // Guardamos todo antes de borrar para poder deshacer
+  const { data: ticketRow } = await sb.from('tickets').select('*').eq('id', ticketId).single();
+  const { data: itemsRows } = await sb.from('ticket_items').select('*').eq('ticket_id', ticketId);
+  const { data: gastosRows } = await sb.from('gastos').select('*').eq('ticket_id', ticketId);
+  if (!ticketRow) { alert('No se encontró el ticket.'); return; }
+
   const { error: errorGastos } = await sb.from('gastos').delete().eq('ticket_id', ticketId);
   if (errorGastos) { alert('No se pudo borrar: ' + errorGastos.message); return; }
   const { error: errorTicket } = await sb.from('tickets').delete().eq('id', ticketId);
   if (errorTicket) { alert('Se borraron los gastos pero no el ticket: ' + errorTicket.message); return; }
-  cargarDashboard();
-  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
+  vibrar();
+  refrescarTodo();
+
+  mostrarToast('Ticket borrado', async () => {
+    const r1 = await sb.from('tickets').insert(ticketRow);
+    if (r1.error) { alert('No se pudo restaurar el ticket: ' + r1.error.message); return; }
+    if (itemsRows && itemsRows.length) {
+      const r2 = await sb.from('ticket_items').upsert(itemsRows);
+      if (r2.error) { alert('Ticket restaurado, pero no sus artículos: ' + r2.error.message); }
+    }
+    if (gastosRows && gastosRows.length) {
+      const r3 = await sb.from('gastos').insert(gastosRows);
+      if (r3.error) { alert('Ticket restaurado, pero no sus gastos: ' + r3.error.message); return; }
+    }
+    refrescarTodo();
+    mostrarToast('Ticket restaurado');
+  });
 }
 
 // ---------------- GASTO MANUAL / OCASIONAL ----------------
 document.getElementById('manual-cancelar').addEventListener('click', () => document.getElementById('modal-manual').classList.remove('open'));
+
+function renderChipsManual(seleccionId) {
+  const cont = document.getElementById('manual-chips');
+  const activas = categoriasCache.filter((c) => c.activa);
+  cont.innerHTML = activas.map((c) => `
+    <button type="button" class="cat-chip ${c.id === seleccionId ? 'sel' : ''}" data-id="${c.id}">${iconoCategoria(c.nombre)} ${c.nombre}</button>
+  `).join('');
+  document.getElementById('manual-categoria').value = seleccionId || '';
+  cont.querySelectorAll('.cat-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      cont.querySelectorAll('.cat-chip').forEach((c) => c.classList.remove('sel'));
+      chip.classList.add('sel');
+      document.getElementById('manual-categoria').value = chip.dataset.id;
+    });
+  });
+}
 
 function abrirModalManual(existing) {
   modalManualEditId = existing?.id || null;
@@ -627,16 +728,26 @@ function abrirModalManual(existing) {
   document.getElementById('manual-importe').value = existing?.importe || '';
   document.getElementById('manual-fecha').value = existing?.fecha || hoyISO();
   document.getElementById('manual-borrar').style.display = modalManualEditId ? 'block' : 'none';
-  poblarSelectCategorias(document.getElementById('manual-categoria'), existing?.categoriaId);
+
+  let seleccion = existing?.categoriaId;
+  if (!seleccion) {
+    let ultima = null;
+    try { ultima = localStorage.getItem('gastos-ultima-cat'); } catch (e) {}
+    const activas = categoriasCache.filter((c) => c.activa);
+    seleccion = activas.find((c) => c.id === ultima)?.id || activas[0]?.id;
+  }
+  renderChipsManual(seleccion);
   document.getElementById('modal-manual').classList.add('open');
+  if (!modalManualEditId) setTimeout(() => document.getElementById('manual-importe').focus(), 250);
 }
 
 document.getElementById('manual-guardar').addEventListener('click', async () => {
-  const descripcion = document.getElementById('manual-descripcion').value.trim();
+  let descripcion = document.getElementById('manual-descripcion').value.trim();
   const importe = parseFloat(document.getElementById('manual-importe').value);
   const fecha = document.getElementById('manual-fecha').value;
   const categoriaId = document.getElementById('manual-categoria').value;
-  if (!descripcion || !importe || !fecha || !categoriaId) { alert('Rellena todos los campos.'); return; }
+  if (!importe || !fecha || !categoriaId) { alert('Pon el importe y elige una categoría.'); return; }
+  if (!descripcion) descripcion = nombreCategoria(categoriaId);
 
   let error;
   if (modalManualEditId) {
@@ -646,19 +757,28 @@ document.getElementById('manual-guardar').addEventListener('click', async () => 
   }
   if (error) { alert('Error: ' + error.message); return; }
 
+  try { localStorage.setItem('gastos-ultima-cat', categoriaId); } catch (e) {}
   document.getElementById('modal-manual').classList.remove('open');
-  cargarDashboard();
-  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
+  vibrar();
+  mostrarToast('Guardado · ' + euros(importe));
+  refrescarTodo();
 });
 
 document.getElementById('manual-borrar').addEventListener('click', async () => {
   if (!modalManualEditId) return;
-  if (!confirm('¿Borrar este gasto?')) return;
-  const { error } = await sb.from('gastos').delete().eq('id', modalManualEditId);
+  const id = modalManualEditId;
+  const { data: fila } = await sb.from('gastos').select('*').eq('id', id).single();
+  const { error } = await sb.from('gastos').delete().eq('id', id);
   if (error) { alert('No se pudo borrar: ' + error.message); return; }
   document.getElementById('modal-manual').classList.remove('open');
-  cargarDashboard();
-  if (document.getElementById('view-tickets').classList.contains('active')) cargarTickets();
+  vibrar();
+  refrescarTodo();
+  mostrarToast('Gasto borrado', async () => {
+    if (!fila) return;
+    const r = await sb.from('gastos').insert(fila);
+    if (r.error) { alert('No se pudo restaurar: ' + r.error.message); return; }
+    refrescarTodo();
+  });
 });
 
 function editarGasto(row) {
@@ -695,7 +815,16 @@ async function cargarDashboard() {
     porCategoria[nombre] = (porCategoria[nombre] || 0) + Number(g.importe);
   });
 
-  dibujarDonut(porCategoria);
+  // Periodo anterior, para la comparativa por categoría
+  const periodoPrev = calcularPeriodo(addDias(inicioMes, -1));
+  const { data: dataPrev } = await sb.from('gastos').select('importe, categoria_id').eq('estado', 'confirmado').gte('fecha', periodoPrev.inicio).lte('fecha', periodoPrev.fin);
+  const prevPorCategoria = {};
+  (dataPrev || []).forEach((g) => {
+    const nombre = nombreCategoria(g.categoria_id);
+    prevPorCategoria[nombre] = (prevPorCategoria[nombre] || 0) + Number(g.importe);
+  });
+
+  dibujarDonut(porCategoria, prevPorCategoria);
   renderMovimientos(data, comercioPorTicket, 'movimientos-list', false);
   cargarFijosResumen(data);
   cargarAhorroResumen();
@@ -828,7 +957,24 @@ document.getElementById('fijos-resumen-header').addEventListener('click', () => 
   chevron.style.transform = abierto ? '' : 'rotate(180deg)';
 });
 
-function dibujarDonut(porCategoria) {
+function htmlDelta(actual, previo) {
+  if (!previo || previo <= 0) return '';
+  const pct = Math.round(((actual - previo) / previo) * 100);
+  if (pct === 0) return '';
+  return `<span class="legend-delta ${pct > 0 ? 'delta-up' : 'delta-down'}">${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)} %</span>`;
+}
+
+function htmlPresupuesto(nombre, gastado) {
+  const catId = categoriasCache.find((c) => c.nombre === nombre)?.id;
+  const limite = presupuestosCache[catId];
+  if (!limite) return '';
+  const pct = (gastado / limite) * 100;
+  const clase = pct > 100 ? 'pasado' : pct >= 80 ? 'aviso' : '';
+  const texto = pct > 100 ? `Te has pasado ${euros(gastado - limite)}` : `Quedan ${euros(limite - gastado)} de ${euros(limite)}`;
+  return `<div class="bud-bar"><div class="bud-fill ${clase}" style="width:${Math.min(pct, 100)}%"></div></div><div class="bud-txt ${clase}">${texto}</div>`;
+}
+
+function dibujarDonut(porCategoria, prevPorCategoria = {}) {
   const labels = Object.keys(porCategoria);
   const valores = Object.values(porCategoria);
 
@@ -854,7 +1000,10 @@ function dibujarDonut(porCategoria) {
   legend.innerHTML = ordenado.map(([nombre, importe]) => `
     <div class="legend-row" data-nombre="${nombre}">
       <div class="legend-dot" style="background:${colorCategoria(nombre)};"></div>
-      <div class="legend-name">${nombre}</div>
+      <div class="legend-main">
+        <span class="legend-name">${nombre}${htmlDelta(importe, prevPorCategoria[nombre])}</span>
+        ${htmlPresupuesto(nombre, importe)}
+      </div>
       <div class="legend-amt">${euros(importe)}</div>
     </div>
   `).join('') || '<div class="empty-state" style="padding:0;">Sin gastos este periodo.</div>';
@@ -873,12 +1022,12 @@ async function abrirDetalleCategoria(nombreCat) {
   const total = (data || []).reduce((a, g) => a + Number(g.importe), 0);
 
   document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(nombreCat, 16)} ${nombreCat} — ${euros(total)}`;
-  document.getElementById('modal-cat-contenido').innerHTML = (data || []).map((g) => `
+  document.getElementById('modal-cat-contenido').innerHTML = `<div style="margin-bottom:12px;">${htmlPresupuesto(nombreCat, total)}</div>` + ((data || []).map((g) => `
     <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
       <span>${g.descripcion}</span>
       <span>${euros(g.importe)}</span>
     </div>
-  `).join('') || '<div class="empty-state">Sin gastos en esta categoría.</div>';
+  `).join('') || '<div class="empty-state">Sin gastos en esta categoría.</div>');
 
   document.getElementById('modal-cat-contenido').querySelectorAll('.ticket-item-row').forEach((row) => {
     row.addEventListener('click', () => { document.getElementById('modal-categoria-detalle').classList.remove('open'); editarGasto(row); });
@@ -1009,6 +1158,59 @@ function abrirDetalleEtiquetaGeneral(etiqueta, data) {
     row.addEventListener('click', () => { document.getElementById('modal-categoria-detalle').classList.remove('open'); editarGasto(row); });
   });
   document.getElementById('modal-categoria-detalle').classList.add('open');
+}
+
+// ---------------- BUSCADOR (pestaña Tickets) ----------------
+let buscarTimer = null;
+const buscarInput = document.getElementById('buscar-input');
+const buscarLimpiar = document.getElementById('buscar-limpiar');
+
+buscarInput.addEventListener('input', () => {
+  buscarLimpiar.style.display = buscarInput.value ? 'block' : 'none';
+  clearTimeout(buscarTimer);
+  buscarTimer = setTimeout(ejecutarBusqueda, 300);
+});
+buscarLimpiar.addEventListener('click', () => {
+  buscarInput.value = '';
+  buscarLimpiar.style.display = 'none';
+  ejecutarBusqueda();
+});
+
+async function ejecutarBusqueda() {
+  const q = buscarInput.value.trim().replace(/[,()%*]/g, ' ');
+  const res = document.getElementById('buscar-resultados');
+  const normal = document.getElementById('tickets-normal');
+  if (q.length < 2) { res.style.display = 'none'; normal.style.display = 'block'; return; }
+  normal.style.display = 'none';
+  res.style.display = 'block';
+
+  const qn = q.toLowerCase();
+  const idsCat = categoriasCache.filter((c) => c.nombre.toLowerCase().includes(qn)).map((c) => c.id);
+  let filtro = `descripcion.ilike.%${q}%`;
+  if (idsCat.length) filtro += `,categoria_id.in.(${idsCat.join(',')})`;
+  const numero = parseFloat(q.replace(',', '.'));
+  if (!isNaN(numero) && /^[0-9]+([.,][0-9]+)?$/.test(q)) filtro += `,importe.eq.${numero}`;
+
+  const { data, error } = await sb.from('gastos').select('*').eq('estado', 'confirmado').or(filtro).order('fecha', { ascending: false }).limit(100);
+  if (buscarInput.value.trim().replace(/[,()%*]/g, ' ') !== q) return; // llegó tarde, ya se escribió otra cosa
+  if (error) { res.innerHTML = `<div class="empty-state">No se pudo buscar: ${error.message}</div>`; return; }
+
+  const total = (data || []).reduce((a, g) => a + Number(g.importe), 0);
+  res.innerHTML = (data && data.length)
+    ? `<div class="hint-text" style="margin:0 4px 10px;">${data.length}${data.length === 100 ? '+' : ''} resultado(s) · ${euros(total)}</div>` + data.map((g) => {
+        const nombreCat = nombreCategoria(g.categoria_id);
+        return `
+        <div class="search-res-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
+          <div class="ticket-card-icon" style="background:${colorCategoria(nombreCat)}33; color:${colorCategoria(nombreCat)};">${iconoCategoria(nombreCat)}</div>
+          <div class="ticket-card-info">
+            <div class="ticket-card-name">${g.descripcion}</div>
+            <div class="ticket-card-date">${new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} · ${nombreCat}</div>
+          </div>
+          <div class="ticket-card-amt">${euros(g.importe)}</div>
+        </div>`;
+      }).join('')
+    : '<div class="empty-state">No hay gastos que coincidan.</div>';
+  res.querySelectorAll('.search-res-row').forEach((row) => row.addEventListener('click', () => editarGasto(row)));
 }
 
 // ---------------- ARRANQUE ----------------
