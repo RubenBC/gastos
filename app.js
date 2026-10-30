@@ -990,8 +990,9 @@ document.getElementById('fijos-resumen-header').addEventListener('click', () => 
 function htmlDelta(actual, previo) {
   if (!previo || previo <= 0) return '';
   const pct = Math.round(((actual - previo) / previo) * 100);
-  if (pct === 0) return '';
-  return `<span class="legend-delta ${pct > 0 ? 'delta-up' : 'delta-down'}">${pct > 0 ? '▲' : '▼'} ${Math.abs(pct)} %</span>`;
+  const clase = pct > 0 ? 'delta-up' : pct < 0 ? 'delta-down' : '';
+  const flecha = pct > 0 ? '▲ ' : pct < 0 ? '▼ ' : '= ';
+  return `<span class="legend-delta ${clase}">${flecha}${Math.abs(pct)} % <span style="opacity:0.75; font-weight:500;">(${euros(previo)})</span></span>`;
 }
 
 function htmlPresupuesto(nombre, gastado) {
