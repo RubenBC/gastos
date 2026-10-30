@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=4.8.0">
+<link rel="manifest" href="./manifest.json?v=4.8.1">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -82,8 +82,8 @@
   /* ---------- Rosco protagonista + leyenda ---------- */
   .donut-hero-wrap{display:flex; flex-direction:column; align-items:center; margin:8px 0 6px;}
   .donut-hero{position:relative; width:64vw; max-width:260px; height:64vw; max-height:260px;}
-  .donut-hero canvas{position:absolute; inset:0; width:100% !important; height:100% !important;}
-  .donut-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
+  .donut-hero canvas{position:absolute; inset:0; width:100% !important; height:100% !important; z-index:3;}
+  .donut-center{z-index:1; position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
   .donut-ingresos{font-size:12px; font-weight:600; color:var(--md-success); opacity:0.85;}
   .donut-gastos-label{font-size:10.5px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.05em; margin-top:6px;}
   .donut-gastos-amt{font-size:22px; font-weight:700; color:var(--md-on-surface); margin-top:2px;}
@@ -510,7 +510,7 @@
 <div class="toast" id="toast"><span class="toast-msg" id="toast-msg"></span><button class="toast-undo" id="toast-undo">Deshacer</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=4.8.0"></script>
-<script src="./app.js?v=4.8.0"></script>
+<script src="./config.js?v=4.8.1"></script>
+<script src="./app.js?v=4.8.1"></script>
 </body>
 </html>

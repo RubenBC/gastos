@@ -987,7 +987,12 @@ function dibujarDonut(porCategoria, prevPorCategoria = {}) {
         data: { labels, datasets: [{ data: valores, backgroundColor: labels.map(colorCategoria), borderWidth: 0 }] },
         options: {
           cutout: '68%',
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } },
+          plugins: { legend: { display: false }, tooltip: {
+            backgroundColor: document.body.classList.contains('tema-claro') ? '#2B3327' : '#F0F5EB',
+            titleColor: document.body.classList.contains('tema-claro') ? '#FFFFFF' : '#16221B',
+            bodyColor: document.body.classList.contains('tema-claro') ? '#FFFFFF' : '#16221B',
+            padding: 10, cornerRadius: 10, displayColors: false,
+            callbacks: { title: () => '', label: (ctx) => `${ctx.label}: ${euros(ctx.raw)}` } } },
         },
       });
     }
