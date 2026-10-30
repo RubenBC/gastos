@@ -1159,16 +1159,21 @@ async function cargarTickets() {
   const comercioPorTicket = {};
   (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
 
+  // Una etiqueta por categoría: las 3 de siempre + 'Otros' fijas, y cualquier otra que tenga gasto
   const porEtiqueta = {};
   ETIQUETAS_TICKETS.forEach((e) => { porEtiqueta[e] = 0; });
   data.forEach((g) => {
     const nombre = nombreCategoria(g.categoria_id);
-    const etiqueta = ETIQUETAS_TICKETS.includes(nombre) ? nombre : 'Otros';
-    porEtiqueta[etiqueta] += Number(g.importe);
+    porEtiqueta[nombre] = (porEtiqueta[nombre] || 0) + Number(g.importe);
   });
+  const etiquetas = [
+    ...ETIQUETAS_TICKETS.slice(0, 3),
+    ...Object.keys(porEtiqueta).filter((e) => !ETIQUETAS_TICKETS.includes(e) && porEtiqueta[e] > 0).sort((x, y) => porEtiqueta[y] - porEtiqueta[x]),
+    'Otros',
+  ];
 
   const chips = document.getElementById('tickets-chips');
-  chips.innerHTML = ETIQUETAS_TICKETS.map((e) => `
+  chips.innerHTML = etiquetas.map((e) => `
     <div class="m3-chip" data-etiqueta="${e}">${iconoCategoria(e)} ${e} <span class="chip-amt">${euros(porEtiqueta[e])}</span></div>
   `).join('');
   chips.querySelectorAll('.m3-chip').forEach((chip) => {
@@ -1180,8 +1185,7 @@ async function cargarTickets() {
 
 function abrirDetalleEtiquetaGeneral(etiqueta, data) {
   const items = data.filter((g) => {
-    const nombre = nombreCategoria(g.categoria_id);
-    return etiqueta === 'Otros' ? !ETIQUETAS_TICKETS.slice(0, 3).includes(nombre) : nombre === etiqueta;
+    return nombreCategoria(g.categoria_id) === etiqueta;
   });
   const total = items.reduce((a, g) => a + Number(g.importe), 0);
   document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(etiqueta, 16)} ${etiqueta} — ${euros(total)}`;
