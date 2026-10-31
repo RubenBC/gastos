@@ -76,6 +76,7 @@ function iconoCategoria(nombre) {
   // Mantiene compatibilidad: ahora devuelve el SVG en vez de un emoji
   return iconoSVG(nombre, 16);
 }
+function esc(v) { return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function euros(n) { return (Number(n) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
 function fechaLocal(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 function ultimoDiaMes(y, m) { return new Date(y, m + 1, 0).getDate(); }
@@ -137,6 +138,28 @@ document.getElementById('toast-undo').addEventListener('click', async () => {
   document.getElementById('toast').classList.remove('show');
   if (fn) await fn();
 });
+// Bloquea un botón mientras dura una operación, para evitar dobles pulsaciones
+async function conBoton(btn, fn) {
+  if (!btn || btn.disabled) return;
+  const texto = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try { return await fn(); } finally { btn.disabled = false; btn.textContent = texto; }
+}
+function limpiarTexto(t) { return (t || '').replace(/\s+/g, ' ').trim(); }
+function parsePrecio(t) {
+  let s = (t || '').replace(/[€\s]/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+}
+// Fecha de cobro de un fijo dentro del periodo que empieza en inicioISO
+function fechaCobroEnPeriodo(dia, inicioISO) {
+  const d = new Date(inicioISO + 'T00:00:00');
+  let y = d.getFullYear(), m = d.getMonth();
+  let f = fechaLocal(y, m, Math.min(dia, ultimoDiaMes(y, m)));
+  if (f < inicioISO) { m += 1; if (m > 11) { m = 0; y += 1; } f = fechaLocal(y, m, Math.min(dia, ultimoDiaMes(y, m))); }
+  return f;
+}
 function vibrar() { try { navigator.vibrate && navigator.vibrate(15); } catch (e) {} }
 function refrescarTodo() {
   cargarDashboard();
@@ -219,7 +242,7 @@ document.getElementById('reiniciar-periodo-btn').addEventListener('click', async
 
 function poblarSelectCategorias(sel, categoriaIdActual) {
   const activas = categoriasCache.filter((c) => c.activa);
-  sel.innerHTML = activas.map((c) => `<option value="${c.id}" ${c.id === categoriaIdActual ? 'selected' : ''}>${c.nombre}</option>`).join('');
+  sel.innerHTML = activas.map((c) => `<option value="${c.id}" ${c.id === categoriaIdActual ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('');
   if (!categoriaIdActual && activas.length) sel.value = activas[0].id;
 }
 
@@ -510,7 +533,7 @@ function renderPresupuestos() {
   cont.innerHTML = categoriasCache.filter((c) => c.activa).map((c) => `
     <div class="bud-row">
       <div class="cat-icon-circ" style="background:${colorCategoria(c.nombre)}33; color:${colorCategoria(c.nombre)};">${iconoCategoria(c.nombre)}</div>
-      <div class="cat-name">${c.nombre}</div>
+      <div class="cat-name">${esc(c.nombre)}</div>
       <input type="number" inputmode="decimal" step="1" min="0" placeholder="Sin límite" data-cat-id="${c.id}" value="${presupuestosCache[c.id] || ''}">
     </div>
   `).join('');
@@ -537,7 +560,7 @@ function renderCategorias() {
     <div class="cat-row">
       <div class="cat-row-left">
         <div class="cat-icon-circ" style="background:${colorCategoria(c.nombre)}33; color:${colorCategoria(c.nombre)};">${iconoCategoria(c.nombre)}</div>
-        <div class="cat-name">${c.nombre}</div>
+        <div class="cat-name">${esc(c.nombre)}</div>
       </div>
       <div class="cat-row-right">
         ${c.nombre.toLowerCase() === 'otros' ? '' : `<button class="cat-del" data-del="${c.id}" aria-label="Eliminar">${svgInline(ICONO_PAPELERA, 17)}</button>`}
@@ -580,7 +603,7 @@ async function eliminarCategoria(id) {
   refrescarTodo();
 }
 
-document.getElementById('add-cat-btn').addEventListener('click', async () => {
+document.getElementById('add-cat-btn').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const input = document.getElementById('nueva-cat-nombre');
   const nombre = input.value.trim();
   if (!nombre) return;
@@ -588,7 +611,7 @@ document.getElementById('add-cat-btn').addEventListener('click', async () => {
   input.value = '';
   await cargarCategorias();
   renderCategorias();
-});
+}));
 
 // ---------------- NÓMINA ----------------
 async function cargarNominaConfig() {
@@ -610,24 +633,26 @@ async function cargarNominaConfig() {
   }
 }
 
-document.getElementById('nomina-guardar').addEventListener('click', async () => {
+document.getElementById('nomina-guardar').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const importe = parseFloat(document.getElementById('nomina-importe').value);
   if (!importe) { alert('Pon un importe.'); return; }
   if (nominaEsteMesId) {
-    await sb.from('ingresos').update({ importe }).eq('id', nominaEsteMesId);
+    const { error } = await sb.from('ingresos').update({ importe }).eq('id', nominaEsteMesId);
+    if (error) { alert('No se pudo guardar la nómina: ' + error.message); return; }
   } else {
     const { data, error } = await sb.from('ingresos').insert({ fecha: hoyISO(), importe, descripcion: 'Nómina' }).select().single();
-    if (!error) nominaEsteMesId = data.id;
+    if (error) { alert('No se pudo guardar la nómina: ' + error.message); return; }
+    nominaEsteMesId = data.id;
   }
+  mostrarToast('Nómina guardada · ' + euros(importe));
   cargarDashboard();
-});
+}));
 
 // ---------------- FIJOS ----------------
 async function cargarFijosConfig() {
   const { data: fijos, error } = await sb.from('gastos_fijos').select('*').eq('activo', true);
   if (error) { console.error(error); return; }
 
-  const hoy = new Date();
   const rangoActual = calcularPeriodo(hoyISO());
   const { data: gastosDelMes } = await sb.from('gastos').select('gasto_fijo_id').eq('origen', 'fijo').eq('estado', 'confirmado').gte('fecha', rangoActual.inicio);
   const pagadosIds = new Set((gastosDelMes || []).map((g) => g.gasto_fijo_id));
@@ -635,30 +660,30 @@ async function cargarFijosConfig() {
   const cont = document.getElementById('fijos-list');
   cont.innerHTML = fijos.map((f) => {
     const pagado = pagadosIds.has(f.id);
-    const diaHoy = hoy.getDate();
-    let badgeClass = 'badge-proximo', badgeText = `Próximo: día ${f.dia_cobro}`;
+    const cobro = fechaCobroEnPeriodo(f.dia_cobro, rangoActual.inicio);
+    let badgeClass = 'badge-proximo', badgeText = `Próximo: ${new Date(cobro + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
     if (pagado) { badgeClass = 'badge-pagado'; badgeText = 'Pagado'; }
-    else if (diaHoy > f.dia_cobro) { badgeClass = 'badge-confirmar'; badgeText = 'Confirmar importe'; }
+    else if (cobro <= hoyISO()) { badgeClass = 'badge-confirmar'; badgeText = 'Confirmar importe'; }
 
     return `
       <div class="m3-card">
-        <div class="fijo-top" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}" data-variable="${!f.importe_es_fijo}" data-comovar="${!!f.cuenta_como_variable}">
+        <div class="fijo-top" data-fijo-id="${f.id}" data-nombre="${esc(f.nombre)}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}" data-variable="${!f.importe_es_fijo}" data-comovar="${!!f.cuenta_como_variable}">
           <div>
-            <div class="fijo-name">${f.nombre} <span style="font-size:10px; opacity:0.6;">✎</span></div>
+            <div class="fijo-name">${esc(f.nombre)} <span style="font-size:10px; opacity:0.6;">✎</span></div>
             <div class="fijo-cat">${iconoCategoria(nombreCategoria(f.categoria_id))} ${nombreCategoria(f.categoria_id)} · día ${f.dia_cobro}</div>
           </div>
           <div class="fijo-amt">${f.importe_es_fijo ? euros(f.importe_estimado) : '~' + euros(f.importe_estimado)}${f.importe_es_fijo ? '' : '<span class="approx">estimado</span>'}</div>
         </div>
         <div class="fijo-bottom">
-          <button class="fijo-badge ${badgeClass}" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-comovar="${!!f.cuenta_como_variable}" ${pagado ? 'disabled' : ''}>${badgeText}</button>
-          <button class="cal-chip" data-nombre="${f.nombre}" data-dia="${f.dia_cobro}">📅 Calendario</button>
+          <button class="fijo-badge ${badgeClass}" data-fijo-id="${f.id}" data-nombre="${esc(f.nombre)}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-comovar="${!!f.cuenta_como_variable}" ${pagado ? 'disabled' : ''}>${badgeText}</button>
+          <button class="cal-chip" data-nombre="${esc(f.nombre)}" data-dia="${f.dia_cobro}">📅 Calendario</button>
         </div>
       </div>
     `;
   }).join('') || '<div class="empty-state">Todavía no tienes gastos fijos.</div>';
 
   cont.querySelectorAll('.fijo-top').forEach((el) => el.addEventListener('click', () => abrirModalFijo(el)));
-  cont.querySelectorAll('.fijo-badge:not([disabled])').forEach((btn) => btn.addEventListener('click', () => marcarFijoPagado(btn)));
+  cont.querySelectorAll('.fijo-badge:not([disabled])').forEach((btn) => btn.addEventListener('click', () => conBoton(btn, () => marcarFijoPagado(btn))));
   cont.querySelectorAll('.cal-chip').forEach((btn) => btn.addEventListener('click', () => abrirCalendario(btn.dataset.nombre, parseInt(btn.dataset.dia))));
 
   poblarSelectCategorias(document.getElementById('new-fijo-categoria'));
@@ -689,7 +714,7 @@ function abrirCalendario(nombre, dia) {
   window.open(url, '_blank');
 }
 
-document.getElementById('add-fijo-btn').addEventListener('click', async () => {
+document.getElementById('add-fijo-btn').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const nombre = document.getElementById('new-fijo-nombre').value.trim();
   const categoriaId = document.getElementById('new-fijo-categoria').value;
   const importe = parseFloat(document.getElementById('new-fijo-importe').value);
@@ -707,7 +732,7 @@ document.getElementById('add-fijo-btn').addEventListener('click', async () => {
   document.getElementById('new-fijo-variable').checked = false;
   document.getElementById('new-fijo-comovariable').checked = false;
   cargarFijosConfig();
-});
+}));
 
 function abrirModalFijo(el) {
   const { fijoId, nombre, categoriaId, importe, dia, variable, comovar } = el.dataset;
@@ -723,7 +748,7 @@ function abrirModalFijo(el) {
 document.getElementById('fijo-cancelar').addEventListener('click', () => document.getElementById('modal-fijo').classList.remove('open'));
 document.getElementById('modal-fijo').addEventListener('click', (e) => { if (e.target.id === 'modal-fijo') e.currentTarget.classList.remove('open'); });
 
-document.getElementById('fijo-guardar').addEventListener('click', async () => {
+document.getElementById('fijo-guardar').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const fijoId = document.getElementById('modal-fijo').dataset.fijoId;
   const nombre = document.getElementById('fijo-nombre').value.trim();
   const categoriaId = document.getElementById('fijo-categoria').value;
@@ -740,7 +765,7 @@ document.getElementById('fijo-guardar').addEventListener('click', async () => {
 
   document.getElementById('modal-fijo').classList.remove('open');
   cargarFijosConfig();
-});
+}));
 
 document.getElementById('fijo-borrar').addEventListener('click', async () => {
   const fijoId = document.getElementById('modal-fijo').dataset.fijoId;
@@ -806,13 +831,13 @@ function renderRevisarModal() {
   box.innerHTML = `
     <div class="modal-title">Revisar ticket</div>
     <div class="ticket-preview">
-      <input class="comercio-edit" id="edit-comercio" value="${ticket.comercio}">
+      <input class="comercio-edit" id="edit-comercio" value="${esc(ticket.comercio)}">
       <div class="meta-edit">${ticket.fecha}</div>
       <hr class="divider">
       <div id="items-list">
         ${items.map((item) => `
           <div class="item-edit" data-item-id="${item.id}">
-            <div class="item-name-edit" contenteditable="true" data-field="nombre_articulo">${item.nombre_articulo}</div>
+            <div class="item-name-edit" contenteditable="true" data-field="nombre_articulo">${esc(item.nombre_articulo)}</div>
             <div class="item-row2">
               <select class="item-categoria" data-field="categoria_id"></select>
               <div class="item-price-edit" contenteditable="true" data-field="precio_total">${Number(item.precio_total).toFixed(2)}</div>
@@ -844,7 +869,7 @@ function renderRevisarModal() {
   });
 
   document.getElementById('btn-descartar').addEventListener('click', descartarTicket);
-  document.getElementById('btn-conformar').addEventListener('click', conformarTicket);
+  document.getElementById('btn-conformar').addEventListener('click', (ev) => conBoton(ev.currentTarget, conformarTicket));
   document.getElementById('modal-revisar').classList.add('open');
 
   // Aviso de posible duplicado (se comprueba en segundo plano)
@@ -894,7 +919,7 @@ async function cargarPendientes() {
       <div class="pendientes-lista">
         ${data.map((t) => `
           <div class="pendiente-row" data-ticket-id="${t.id}">
-            <span>${t.comercio} · ${new Date(t.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</span>
+            <span>${esc(t.comercio)} · ${new Date(t.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</span>
             <span>${euros(t.importe_total)}</span>
           </div>
         `).join('')}
@@ -937,12 +962,12 @@ async function conformarTicket() {
 
   const itemsEditados = [...box.querySelectorAll('#items-list .item-edit')].map((row) => ({
     id: row.dataset.itemId,
-    nombre: row.querySelector('[data-field="nombre_articulo"]').textContent.trim(),
-    precio: parseFloat(row.querySelector('[data-field="precio_total"]').textContent.replace(',', '.')) || 0,
+    nombre: limpiarTexto(row.querySelector('[data-field="nombre_articulo"]').textContent) || 'Artículo',
+    precio: parsePrecio(row.querySelector('[data-field="precio_total"]').textContent),
     categoriaId: row.querySelector('[data-field="categoria_id"]').value,
   }));
-  const comercio = normalizarComercio(document.getElementById('edit-comercio').value);
-  const totalFinal = itemsEditados.reduce((a, i) => a + i.precio, 0);
+  const comercio = normalizarComercio(limpiarTexto(document.getElementById('edit-comercio').value));
+  const totalFinal = Math.round(itemsEditados.reduce((a, i) => a + i.precio, 0) * 100) / 100;
 
   if (itemsEditados.length === 0) {
     alert('Este ticket no tiene artículos que confirmar. Descártalo y vuelve a escanearlo.');
@@ -950,10 +975,16 @@ async function conformarTicket() {
   }
 
   try {
-    for (const item of itemsEditados) {
-      const { error } = await sb.from('ticket_items').update({ nombre_articulo: item.nombre, precio_total: item.precio, categoria_id: item.categoriaId }).eq('id', item.id);
-      if (error) throw new Error(`Actualizando "${item.nombre}": ${error.message}`);
-    }
+    // 1. Artículos: todas las actualizaciones a la vez
+    const resultados = await Promise.all(itemsEditados.map((item) =>
+      sb.from('ticket_items').update({ nombre_articulo: item.nombre, precio_total: item.precio, categoria_id: item.categoriaId }).eq('id', item.id)));
+    const fallo = resultados.find((r) => r.error);
+    if (fallo) throw new Error(`Actualizando artículos: ${fallo.error.message}`);
+
+    // 2. Gastos: se borran los que hubiera de un intento anterior y se crean de nuevo,
+    //    así reintentar nunca duplica
+    const { error: borrarError } = await sb.from('gastos').delete().eq('ticket_id', ticket.id);
+    if (borrarError) throw new Error(`Preparando los gastos: ${borrarError.message}`);
     const filasGasto = itemsEditados.map((item) => ({
       fecha: ticket.fecha, importe: item.precio, categoria_id: item.categoriaId,
       descripcion: `${comercio} — ${item.nombre}`, origen: 'ticket', estado: 'confirmado', ticket_id: ticket.id,
@@ -961,6 +992,7 @@ async function conformarTicket() {
     const { error: gastosError } = await sb.from('gastos').insert(filasGasto);
     if (gastosError) throw new Error(`Creando los gastos: ${gastosError.message}`);
 
+    // 3. Ticket confirmado
     const { error: ticketError } = await sb.from('tickets').update({ comercio, importe_total: totalFinal, estado: 'confirmado' }).eq('id', ticket.id);
     if (ticketError) throw new Error(`Marcando el ticket como confirmado: ${ticketError.message}`);
 
@@ -971,7 +1003,7 @@ async function conformarTicket() {
     cargarDashboard();
     cargarPendientes();
   } catch (err) {
-    alert('No se pudo conformar el ticket:\n\n' + err.message + '\n\nSigue en pendiente. Vuelve a intentarlo.');
+    alert('No se pudo conformar el ticket:\n\n' + err.message + '\n\nSigue en pendiente. Puedes volver a intentarlo sin miedo a duplicar.');
   }
 }
 
@@ -1012,7 +1044,7 @@ function renderChipsManual(seleccionId) {
   const cont = document.getElementById('manual-chips');
   const activas = categoriasCache.filter((c) => c.activa);
   cont.innerHTML = activas.map((c) => `
-    <button type="button" class="cat-chip ${c.id === seleccionId ? 'sel' : ''}" data-id="${c.id}">${iconoCategoria(c.nombre)} ${c.nombre}</button>
+    <button type="button" class="cat-chip ${c.id === seleccionId ? 'sel' : ''}" data-id="${c.id}">${iconoCategoria(c.nombre)} ${esc(c.nombre)}</button>
   `).join('');
   document.getElementById('manual-categoria').value = seleccionId || '';
   cont.querySelectorAll('.cat-chip').forEach((chip) => {
@@ -1050,8 +1082,8 @@ function abrirModalManual(existing) {
   if (!modalManualEditId) setTimeout(() => document.getElementById('manual-importe').focus(), 250);
 }
 
-document.getElementById('manual-guardar').addEventListener('click', async () => {
-  let descripcion = document.getElementById('manual-descripcion').value.trim();
+document.getElementById('manual-guardar').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
+  let descripcion = limpiarTexto(document.getElementById('manual-descripcion').value);
   const importe = parseFloat(document.getElementById('manual-importe').value);
   const fecha = document.getElementById('manual-fecha').value;
   const categoriaId = document.getElementById('manual-categoria').value;
@@ -1072,7 +1104,7 @@ document.getElementById('manual-guardar').addEventListener('click', async () => 
   vibrar();
   mostrarToast('Guardado · ' + euros(importe));
   refrescarTodo();
-});
+}));
 
 async function borrarGastoConDeshacer(id) {
   const { data: fila } = await sb.from('gastos').select('*').eq('id', id).single();
@@ -1225,7 +1257,7 @@ document.getElementById('ahorro-header').addEventListener('click', () => {
   chevron.style.transform = abierto ? '' : 'rotate(180deg)';
 });
 
-document.getElementById('ahorro-guardar').addEventListener('click', async () => {
+document.getElementById('ahorro-guardar').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const saldo = parseFloat(document.getElementById('ahorro-importe').value);
   if (isNaN(saldo)) { alert('Pon el saldo actual.'); return; }
 
@@ -1237,7 +1269,7 @@ document.getElementById('ahorro-guardar').addEventListener('click', async () => 
   }
   if (error) { alert('No se pudo guardar: ' + error.message); return; }
   cargarAhorroResumen();
-});
+}));
 
 async function cargarFijosResumen(gastosDelMes) {
   const { data: fijos, error } = await sb.from('gastos_fijos').select('*').eq('activo', true);
@@ -1248,8 +1280,8 @@ async function cargarFijosResumen(gastosDelMes) {
   document.getElementById('fijos-resumen-icon').innerHTML = svgInline('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10.5h18"/><path d="M6.5 14.5h4"/>', 18);
 
   const pagadosIds = new Set((gastosDelMes || []).filter((g) => g.origen === 'fijo').map((g) => g.gasto_fijo_id));
-  const hoy = new Date().getDate();
-  const mesReal = calcularPeriodo(cursorFecha).esActual;
+  const periodoVisto = calcularPeriodo(cursorFecha);
+  const mesReal = periodoVisto.esActual;
 
   const detalle = document.getElementById('fijos-resumen-detalle');
   detalle.innerHTML = (fijos || []).map((f) => {
@@ -1257,10 +1289,10 @@ async function cargarFijosResumen(gastosDelMes) {
     let badgeClass = 'badge-proximo', badgeText = `Día ${f.dia_cobro}`;
     if (pagado) { badgeClass = 'badge-pagado'; badgeText = 'Pagado'; }
     else if (!mesReal) { badgeClass = 'badge-confirmar'; badgeText = 'No registrado'; }
-    else if (hoy > f.dia_cobro) { badgeClass = 'badge-confirmar'; badgeText = 'Pendiente'; }
+    else if (fechaCobroEnPeriodo(f.dia_cobro, periodoVisto.inicio) <= hoyISO()) { badgeClass = 'badge-confirmar'; badgeText = 'Pendiente'; }
     return `
       <div class="ticket-item-row" style="align-items:center;">
-        <span style="display:flex; align-items:center; gap:8px;">${iconoSVG(nombreCategoria(f.categoria_id), 15)} ${f.nombre}</span>
+        <span style="display:flex; align-items:center; gap:8px;">${iconoSVG(nombreCategoria(f.categoria_id), 15)} ${esc(f.nombre)}</span>
         <span style="display:flex; align-items:center; gap:8px;">
           <span class="fijo-badge ${badgeClass}" style="font-size:9.5px; padding:3px 8px;">${badgeText}</span>
           ${euros(f.importe_estimado)}
@@ -1325,10 +1357,10 @@ function dibujarDonut(porCategoria, prevPorCategoria = {}) {
   const legend = document.getElementById('legend-list');
   const ordenado = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
   legend.innerHTML = ordenado.map(([nombre, importe]) => `
-    <div class="legend-row" data-nombre="${nombre}">
+    <div class="legend-row" data-nombre="${esc(nombre)}">
       <div class="legend-dot" style="background:${colorCategoria(nombre)};"></div>
       <div class="legend-main">
-        <span class="legend-name">${nombre}${htmlDelta(importe, prevPorCategoria[nombre])}</span>
+        <span class="legend-name">${esc(nombre)}${htmlDelta(importe, prevPorCategoria[nombre])}</span>
         ${htmlPresupuesto(nombre, importe)}
       </div>
       <div class="legend-amt">${euros(importe)}</div>
@@ -1349,10 +1381,10 @@ async function abrirDetalleCategoria(nombreCat) {
   const data = (dataTodos || []).filter((g) => modoRosco === 'todo' || !esFijo(g));
   const total = (data || []).reduce((a, g) => a + Number(g.importe), 0);
 
-  document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(nombreCat, 16)} ${nombreCat} — ${euros(total)}`;
+  document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(nombreCat, 16)} ${esc(nombreCat)} — ${euros(total)}`;
   document.getElementById('modal-cat-contenido').innerHTML = `<div style="margin-bottom:12px;">${htmlPresupuesto(nombreCat, total)}</div>` + ((data || []).map((g) => `
-    <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-      <span>${g.descripcion}</span>
+    <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${esc(g.descripcion)}" data-fecha="${g.fecha}">
+      <span>${esc(g.descripcion)}</span>
       <span>${euros(g.importe)}</span>
     </div>
   `).join('') || '<div class="empty-state">Sin gastos en esta categoría.</div>');
@@ -1393,7 +1425,7 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
           <div class="ticket-card-header">
             <div class="ticket-card-icon" style="background:${colorCategoria(e.items[0] ? nombreCategoria(e.items[0].categoria_id) : 'otros')}33; color:${colorCategoria(e.items[0] ? nombreCategoria(e.items[0].categoria_id) : 'otros')};">${svgInline(ICONO_RECIBO, 18)}</div>
             <div class="ticket-card-info">
-              <div class="ticket-card-name">${e.comercio}</div>
+              <div class="ticket-card-name">${esc(e.comercio)}</div>
               <div class="ticket-card-date">${new Date(e.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
             </div>
             <div class="ticket-card-amt">${euros(e.total)}</div>
@@ -1402,8 +1434,8 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
           </div>
           <div class="ticket-card-detail">
             ${e.items.map((it) => `
-              <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${it.descripcion}" data-fecha="${it.fecha}">
-                <span>${iconoCategoria(nombreCategoria(it.categoria_id))} ${it.descripcion.split(' — ').slice(1).join(' — ') || it.descripcion}</span>
+              <div class="ticket-item-row" data-gasto-id="${it.id}" data-categoria-id="${it.categoria_id}" data-importe="${it.importe}" data-descripcion="${esc(it.descripcion)}" data-fecha="${it.fecha}">
+                <span>${iconoCategoria(nombreCategoria(it.categoria_id))} ${esc(it.descripcion.split(' — ').slice(1).join(' — ') || it.descripcion)}</span>
                 <span>${euros(it.importe)}</span>
               </div>
             `).join('')}
@@ -1414,10 +1446,10 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
     const g = e.gasto;
     return `
       <div class="ticket-card">
-        <div class="ticket-card-header" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}" style="cursor:pointer;">
+        <div class="ticket-card-header" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${esc(g.descripcion)}" data-fecha="${g.fecha}" style="cursor:pointer;">
           <div class="ticket-card-icon" style="background:${colorCategoria(nombreCategoria(g.categoria_id))}33; color:${colorCategoria(nombreCategoria(g.categoria_id))};">${iconoCategoria(nombreCategoria(g.categoria_id))}</div>
           <div class="ticket-card-info">
-            <div class="ticket-card-name">${g.descripcion} ${e.tipo === 'manual' ? '<span class="manual-tag">· manual</span>' : ''}</div>
+            <div class="ticket-card-name">${esc(g.descripcion)} ${e.tipo === 'manual' ? '<span class="manual-tag">· manual</span>' : ''}</div>
             <div class="ticket-card-date">${new Date(g.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}</div>
           </div>
           <div class="ticket-card-amt">${euros(g.importe)}</div>
@@ -1518,7 +1550,7 @@ async function cargarTickets() {
 
   const chips = document.getElementById('tickets-chips');
   chips.innerHTML = etiquetas.map((e) => `
-    <div class="m3-chip" data-etiqueta="${e}">${iconoCategoria(e)} ${e} <span class="chip-amt">${euros(porEtiqueta[e])}</span></div>
+    <div class="m3-chip" data-etiqueta="${esc(e)}">${iconoCategoria(e)} ${esc(e)} <span class="chip-amt">${euros(porEtiqueta[e])}</span></div>
   `).join('');
   chips.querySelectorAll('.m3-chip').forEach((chip) => {
     chip.addEventListener('click', () => abrirDetalleEtiquetaGeneral(chip.dataset.etiqueta, data));
@@ -1532,10 +1564,10 @@ function abrirDetalleEtiquetaGeneral(etiqueta, data) {
     return nombreCategoria(g.categoria_id) === etiqueta;
   });
   const total = items.reduce((a, g) => a + Number(g.importe), 0);
-  document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(etiqueta, 16)} ${etiqueta} — ${euros(total)}`;
+  document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(etiqueta, 16)} ${esc(etiqueta)} — ${euros(total)}`;
   document.getElementById('modal-cat-contenido').innerHTML = items.map((g) => `
-    <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
-      <span>${g.descripcion}</span><span>${euros(g.importe)}</span>
+    <div class="ticket-item-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${esc(g.descripcion)}" data-fecha="${g.fecha}">
+      <span>${esc(g.descripcion)}</span><span>${euros(g.importe)}</span>
     </div>
   `).join('') || '<div class="empty-state">Nada en esta etiqueta todavía.</div>';
   document.getElementById('modal-cat-contenido').querySelectorAll('.ticket-item-row').forEach((row) => {
@@ -1631,18 +1663,18 @@ async function ejecutarBusqueda() {
 
   const { data, error } = await sb.from('gastos').select('*').eq('estado', 'confirmado').or(filtro).order('fecha', { ascending: false }).limit(100);
   if (buscarInput.value.trim().replace(/[,()%*]/g, ' ') !== q) return; // llegó tarde, ya se escribió otra cosa
-  if (error) { res.innerHTML = `<div class="empty-state">No se pudo buscar: ${error.message}</div>`; return; }
+  if (error) { res.innerHTML = `<div class="empty-state">No se pudo buscar: ${esc(error.message)}</div>`; return; }
 
   const total = (data || []).reduce((a, g) => a + Number(g.importe), 0);
   res.innerHTML = (data && data.length)
     ? `<div class="hint-text" style="margin:0 4px 10px;">${data.length}${data.length === 100 ? '+' : ''} resultado(s) · ${euros(total)}</div>` + data.map((g) => {
         const nombreCat = nombreCategoria(g.categoria_id);
         return `
-        <div class="search-res-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${g.descripcion}" data-fecha="${g.fecha}">
+        <div class="search-res-row" data-gasto-id="${g.id}" data-categoria-id="${g.categoria_id}" data-importe="${g.importe}" data-descripcion="${esc(g.descripcion)}" data-fecha="${g.fecha}">
           <div class="ticket-card-icon" style="background:${colorCategoria(nombreCat)}33; color:${colorCategoria(nombreCat)};">${iconoCategoria(nombreCat)}</div>
           <div class="ticket-card-info">
-            <div class="ticket-card-name">${g.descripcion}</div>
-            <div class="ticket-card-date">${new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} · ${nombreCat}</div>
+            <div class="ticket-card-name">${esc(g.descripcion)}</div>
+            <div class="ticket-card-date">${new Date(g.fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })} · ${esc(nombreCat)}</div>
           </div>
           <div class="ticket-card-amt">${euros(g.importe)}</div>
         </div>`;
@@ -1669,11 +1701,11 @@ function dibujarPrecios(q, data) {
   const card = document.createElement('div');
   card.className = 'precio-card';
   card.innerHTML = `
-    <div class="precio-titulo">Precio de «${q}» · ${lineas.length} compras</div>
+    <div class="precio-titulo">Precio de «${esc(q)}» · ${lineas.length} compras</div>
     <div class="precio-stats">
       <div class="precio-stat"><b>${euros(ultima.importe)}</b><span>Última (${fmt(ultima.fecha)})</span></div>
       <div class="precio-stat"><b>${euros(media)}</b><span>Media</span></div>
-      <div class="precio-stat"><b>${euros(min)}</b><span>Más barato (${comercioDe(gMin)}, ${fmt(gMin.fecha)})</span></div>
+      <div class="precio-stat"><b>${euros(min)}</b><span>Más barato (${esc(comercioDe(gMin))}, ${fmt(gMin.fecha)})</span></div>
       <div class="precio-stat"><b>${euros(max)}</b><span>Más caro</span></div>
     </div>
     <div style="position:relative; height:120px;"><canvas id="chart-precio"></canvas></div>
