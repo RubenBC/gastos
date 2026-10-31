@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=5.0.1">
+<link rel="manifest" href="./manifest.json?v=5.1.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -254,6 +254,13 @@
   .cat-chip{display:flex; align-items:center; gap:6px; padding:9px 13px; border-radius:100px; border:1px solid var(--md-outline-variant); background:var(--md-surface-container); color:var(--md-on-surface); font-size:12.5px; font-weight:600; font-family:inherit;}
   .cat-chip.sel{background:var(--md-secondary-container); border-color:transparent; color:var(--md-on-secondary-container);}
 
+  /* ---------- Interruptor Variable / Todo ---------- */
+  .seg{display:flex; background:var(--md-surface-container-high); border-radius:100px; padding:4px; width:max-content; margin:6px auto 4px;}
+  .seg button{border:none; background:none; color:var(--md-on-surface-variant); font-weight:600; font-size:12.5px; padding:8px 20px; border-radius:100px; font-family:inherit;}
+  .seg button.on{background:var(--md-secondary-container); color:var(--md-on-secondary-container);}
+  .fijos-linea{display:flex; justify-content:space-between; align-items:center; background:var(--md-surface-container); border-radius:16px; padding:12px 14px; margin:10px 0 4px; font-size:12.5px; color:var(--md-on-surface-variant); font-weight:600;}
+  .fijos-linea b{color:var(--md-on-surface); font-size:14px;}
+
   /* ---------- Duplicados, vacíos, swipe, precios ---------- */
   .dup-banner{background:var(--md-error-container); color:var(--md-on-error-container); border-radius:16px; padding:12px 14px; font-size:12.5px; font-weight:600; line-height:1.45; margin-bottom:12px;}
   .empty-btn{margin-top:14px; background:var(--md-primary); color:var(--md-on-primary); border:none; border-radius:100px; padding:12px 22px; font-weight:700; font-size:13.5px; font-family:inherit;}
@@ -320,12 +327,16 @@
     <div class="screen">
       <div id="pendientes-banner-cont"></div>
 
+      <div class="seg" id="modo-rosco">
+        <button data-modo="variable">Variable</button>
+        <button data-modo="todo">Todo</button>
+      </div>
       <div class="donut-hero-wrap">
         <div class="donut-hero" id="donut-hero">
           <canvas id="chart-categorias"></canvas>
           <div class="donut-center">
             <div class="donut-ingresos" id="r-ingresos">Ingresos: 0,00 €</div>
-            <div class="donut-gastos-label">gastado este mes</div>
+            <div class="donut-gastos-label" id="r-label">gastado este mes</div>
             <div class="donut-gastos-amt" id="r-gastos">0,00 €</div>
             <div class="donut-ahorro-label">Queda</div>
             <div class="donut-ahorro" id="r-ahorro">0,00 €</div>
@@ -334,6 +345,7 @@
       </div>
 
       <div class="legend-list" id="legend-list"></div>
+      <div class="fijos-linea" id="fijos-linea" style="display:none;"></div>
 
       <div class="spinner" id="capture-spinner"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span> Leyendo ticket con IA…</div>
 
@@ -417,6 +429,7 @@
           <input type="number" id="new-fijo-dia" placeholder="Día" min="1" max="31" style="width:82px;">
         </div>
         <label class="check-inline"><input type="checkbox" id="new-fijo-variable"> El importe varía cada mes</label>
+        <label class="check-inline" id="new-fijo-comovar-wrap"><input type="checkbox" id="new-fijo-comovariable"> Cuenta como variable (sale en el rosco "Variable")</label>
         <button id="add-fijo-btn">Añadir gasto fijo</button>
       </div>
 
@@ -529,6 +542,7 @@
     <input type="hidden" id="manual-categoria">
     <input type="text" id="manual-descripcion" placeholder="¿Qué has pagado? (opcional)">
     <input type="date" id="manual-fecha">
+    <label class="modal-check" id="manual-fijo-wrap"><input type="checkbox" id="manual-fijo"> Es un gasto fijo (no sale en el rosco "Variable")</label>
     <div class="modal-actions">
       <button class="btn-tonal" id="manual-cancelar">Cancelar</button>
       <button class="btn-filled" id="manual-guardar">Guardar</button>
@@ -547,6 +561,7 @@
       <input type="number" id="fijo-dia" placeholder="Día" min="1" max="31">
     </div>
     <label class="modal-check"><input type="checkbox" id="fijo-variable"> El importe varía cada mes (luz, agua...)</label>
+    <label class="modal-check" id="fijo-comovar-wrap"><input type="checkbox" id="fijo-comovariable"> Cuenta como variable (sale en el rosco "Variable")</label>
     <div class="modal-actions">
       <button class="btn-tonal" id="fijo-cancelar">Cancelar</button>
       <button class="btn-filled" id="fijo-guardar">Guardar</button>
@@ -575,7 +590,7 @@
 <div class="toast" id="toast"><span class="toast-msg" id="toast-msg"></span><button class="toast-undo" id="toast-undo">Deshacer</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=5.0.1"></script>
-<script src="./app.js?v=5.0.1"></script>
+<script src="./config.js?v=5.1.0"></script>
+<script src="./app.js?v=5.1.0"></script>
 </body>
 </html>

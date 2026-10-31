@@ -84,6 +84,21 @@ function nombreCategoria(id) { return categoriasCache.find((c) => c.id === id)?.
 
 let categoriasCache = [];
 let presupuestosCache = {}; // categoria_id -> límite
+let soportaTipo = false; // true cuando se ha ejecutado anadir-tipo-fijo-variable.sql
+let modoRosco = (() => { try { return localStorage.getItem('gastos-modo-rosco') || 'variable'; } catch (e) { return 'variable'; } })();
+// Un gasto es "fijo" por su columna tipo; si aún no existe, por venir de la lista de fijos
+function esFijo(g) { return g.tipo ? g.tipo === 'fijo' : g.origen === 'fijo'; }
+function pintarModoRosco() {
+  document.querySelectorAll('#modo-rosco button').forEach((b) => b.classList.toggle('on', b.dataset.modo === modoRosco));
+  const tipoUI = soportaTipo ? '' : 'none';
+  ['manual-fijo-wrap', 'fijo-comovar-wrap', 'new-fijo-comovar-wrap'].forEach((id) => { document.getElementById(id).style.display = tipoUI; });
+}
+document.querySelectorAll('#modo-rosco button').forEach((b) => b.addEventListener('click', () => {
+  modoRosco = b.dataset.modo;
+  try { localStorage.setItem('gastos-modo-rosco', modoRosco); } catch (e) {}
+  pintarModoRosco();
+  cargarDashboard();
+}));
 let ticketActual = null;
 let modalManualEditId = null;
 let nominaEsteMesId = null;
@@ -248,6 +263,10 @@ async function mostrarApp() {
     document.body.classList.add('tema-claro');
     document.getElementById('tema-toggle').classList.remove('off');
   }
+
+  const probe = await sb.from('gastos').select('tipo').limit(1);
+  soportaTipo = !probe.error;
+  pintarModoRosco();
 
   await cargarPeriodos();
   await cargarCategorias();
@@ -598,7 +617,7 @@ async function cargarFijosConfig() {
 
     return `
       <div class="m3-card">
-        <div class="fijo-top" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}" data-variable="${!f.importe_es_fijo}">
+        <div class="fijo-top" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-dia="${f.dia_cobro}" data-variable="${!f.importe_es_fijo}" data-comovar="${!!f.cuenta_como_variable}">
           <div>
             <div class="fijo-name">${f.nombre} <span style="font-size:10px; opacity:0.6;">✎</span></div>
             <div class="fijo-cat">${iconoCategoria(nombreCategoria(f.categoria_id))} ${nombreCategoria(f.categoria_id)} · día ${f.dia_cobro}</div>
@@ -606,7 +625,7 @@ async function cargarFijosConfig() {
           <div class="fijo-amt">${f.importe_es_fijo ? euros(f.importe_estimado) : '~' + euros(f.importe_estimado)}${f.importe_es_fijo ? '' : '<span class="approx">estimado</span>'}</div>
         </div>
         <div class="fijo-bottom">
-          <button class="fijo-badge ${badgeClass}" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" ${pagado ? 'disabled' : ''}>${badgeText}</button>
+          <button class="fijo-badge ${badgeClass}" data-fijo-id="${f.id}" data-nombre="${f.nombre}" data-categoria-id="${f.categoria_id}" data-importe="${f.importe_estimado}" data-comovar="${!!f.cuenta_como_variable}" ${pagado ? 'disabled' : ''}>${badgeText}</button>
           <button class="cal-chip" data-nombre="${f.nombre}" data-dia="${f.dia_cobro}">📅 Calendario</button>
         </div>
       </div>
@@ -629,6 +648,7 @@ async function marcarFijoPagado(btn) {
   const { error } = await sb.from('gastos').insert({
     fecha: hoyISO(), importe: parseFloat(importe), categoria_id: btn.dataset.categoriaId,
     descripcion: btn.dataset.nombre, origen: 'fijo', estado: 'confirmado', gasto_fijo_id: btn.dataset.fijoId,
+    ...(soportaTipo ? { tipo: btn.dataset.comovar === 'true' ? 'variable' : 'fijo' } : {}),
   });
   if (error) { alert('No se pudo registrar: ' + error.message); return; }
   cargarFijosConfig();
@@ -652,18 +672,21 @@ document.getElementById('add-fijo-btn').addEventListener('click', async () => {
   const esVariable = document.getElementById('new-fijo-variable').checked;
   if (!nombre || !importe || !dia || !categoriaId) { alert('Rellena todos los campos.'); return; }
 
-  const { error } = await sb.from('gastos_fijos').insert({ nombre, importe_estimado: importe, dia_cobro: dia, categoria_id: categoriaId, importe_es_fijo: !esVariable });
+  const comoVariable = soportaTipo && document.getElementById('new-fijo-comovariable').checked;
+  const { error } = await sb.from('gastos_fijos').insert({ nombre, importe_estimado: importe, dia_cobro: dia, categoria_id: categoriaId, importe_es_fijo: !esVariable, ...(soportaTipo ? { cuenta_como_variable: comoVariable } : {}) });
   if (error) { alert('Error: ' + error.message); return; }
 
   document.getElementById('new-fijo-nombre').value = '';
   document.getElementById('new-fijo-importe').value = '';
   document.getElementById('new-fijo-dia').value = '';
   document.getElementById('new-fijo-variable').checked = false;
+  document.getElementById('new-fijo-comovariable').checked = false;
   cargarFijosConfig();
 });
 
 function abrirModalFijo(el) {
-  const { fijoId, nombre, categoriaId, importe, dia, variable } = el.dataset;
+  const { fijoId, nombre, categoriaId, importe, dia, variable, comovar } = el.dataset;
+  document.getElementById('fijo-comovariable').checked = comovar === 'true';
   document.getElementById('fijo-nombre').value = nombre;
   document.getElementById('fijo-importe').value = importe;
   document.getElementById('fijo-dia').value = dia;
@@ -684,8 +707,11 @@ document.getElementById('fijo-guardar').addEventListener('click', async () => {
   const variable = document.getElementById('fijo-variable').checked;
   if (!nombre || !importe || !dia || !categoriaId) { alert('Rellena todos los campos.'); return; }
 
-  await sb.from('gastos_fijos').update({ nombre, categoria_id: categoriaId, importe_estimado: importe, dia_cobro: dia, importe_es_fijo: !variable }).eq('id', fijoId);
+  const comoVariable = soportaTipo && document.getElementById('fijo-comovariable').checked;
+  await sb.from('gastos_fijos').update({ nombre, categoria_id: categoriaId, importe_estimado: importe, dia_cobro: dia, importe_es_fijo: !variable, ...(soportaTipo ? { cuenta_como_variable: comoVariable } : {}) }).eq('id', fijoId);
   await sb.from('gastos').update({ categoria_id: categoriaId, descripcion: nombre }).eq('gasto_fijo_id', fijoId).gte('fecha', calcularPeriodo(hoyISO()).inicio);
+  // El tipo (fijo/variable) se aplica a todos sus pagos, también a los anteriores
+  if (soportaTipo) await sb.from('gastos').update({ tipo: comoVariable ? 'variable' : 'fijo' }).eq('gasto_fijo_id', fijoId);
 
   document.getElementById('modal-fijo').classList.remove('open');
   cargarFijosConfig();
@@ -980,6 +1006,12 @@ function abrirModalManual(existing) {
   document.getElementById('manual-importe').value = existing?.importe || '';
   document.getElementById('manual-fecha').value = existing?.fecha || hoyISO();
   document.getElementById('manual-borrar').style.display = modalManualEditId ? 'block' : 'none';
+  document.getElementById('manual-fijo').checked = false;
+  if (soportaTipo && existing?.id) {
+    sb.from('gastos').select('tipo').eq('id', existing.id).single().then(({ data: r }) => {
+      document.getElementById('manual-fijo').checked = r?.tipo === 'fijo';
+    });
+  }
 
   let seleccion = existing?.categoriaId;
   if (!seleccion) {
@@ -1000,12 +1032,13 @@ document.getElementById('manual-guardar').addEventListener('click', async () => 
   const categoriaId = document.getElementById('manual-categoria').value;
   if (!importe || !fecha || !categoriaId) { alert('Pon el importe y elige una categoría.'); return; }
   if (!descripcion) descripcion = nombreCategoria(categoriaId);
+  const extraTipo = soportaTipo ? { tipo: document.getElementById('manual-fijo').checked ? 'fijo' : 'variable' } : {};
 
   let error;
   if (modalManualEditId) {
-    ({ error } = await sb.from('gastos').update({ descripcion, importe, fecha, categoria_id: categoriaId }).eq('id', modalManualEditId));
+    ({ error } = await sb.from('gastos').update({ descripcion, importe, fecha, categoria_id: categoriaId, ...extraTipo }).eq('id', modalManualEditId));
   } else {
-    ({ error } = await sb.from('gastos').insert({ fecha, importe, categoria_id: categoriaId, descripcion, origen: 'manual', estado: 'confirmado' }));
+    ({ error } = await sb.from('gastos').insert({ fecha, importe, categoria_id: categoriaId, descripcion, origen: 'manual', estado: 'confirmado', ...extraTipo }));
   }
   if (error) { alert('Error: ' + error.message); return; }
 
@@ -1059,23 +1092,30 @@ async function cargarDashboard() {
 
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
   const ahorro = totalIngresos - total;
+  const dataRosco = modoRosco === 'variable' ? data.filter((g) => !esFijo(g)) : data;
+  const totalRosco = dataRosco.reduce((a, g) => a + Number(g.importe), 0);
+  const totalFijosPeriodo = data.filter(esFijo).reduce((a, g) => a + Number(g.importe), 0);
 
   document.getElementById('r-ingresos').textContent = 'Ingresos: ' + euros(totalIngresos);
-  document.getElementById('r-gastos').textContent = euros(total);
+  document.getElementById('r-gastos').textContent = euros(totalRosco);
+  document.getElementById('r-label').textContent = modoRosco === 'variable' ? 'variable este periodo' : 'gastado este periodo';
+  const lineaFijos = document.getElementById('fijos-linea');
+  lineaFijos.style.display = modoRosco === 'variable' ? 'flex' : 'none';
+  lineaFijos.innerHTML = `<span>Fijos del periodo (fuera del rosco)</span><b>${euros(totalFijosPeriodo)}</b>`;
   document.getElementById('r-ahorro').textContent = euros(ahorro);
   document.getElementById('r-ahorro').style.color = ahorro >= 0 ? '#E8A05C' : 'var(--md-error)';
 
   const porCategoria = {};
-  data.forEach((g) => {
+  dataRosco.forEach((g) => {
     const nombre = nombreCategoria(g.categoria_id);
     porCategoria[nombre] = (porCategoria[nombre] || 0) + Number(g.importe);
   });
 
   // Periodo anterior, para la comparativa por categoría
   const periodoPrev = calcularPeriodo(addDias(inicioMes, -1));
-  const { data: dataPrev } = await sb.from('gastos').select('importe, categoria_id').eq('estado', 'confirmado').gte('fecha', periodoPrev.inicio).lte('fecha', periodoPrev.fin);
+  const { data: dataPrev } = await sb.from('gastos').select('*').eq('estado', 'confirmado').gte('fecha', periodoPrev.inicio).lte('fecha', periodoPrev.fin);
   const prevPorCategoria = {};
-  (dataPrev || []).forEach((g) => {
+  (dataPrev || []).filter((g) => modoRosco === 'todo' || !esFijo(g)).forEach((g) => {
     const nombre = nombreCategoria(g.categoria_id);
     prevPorCategoria[nombre] = (prevPorCategoria[nombre] || 0) + Number(g.importe);
   });
@@ -1280,7 +1320,8 @@ async function abrirDetalleCategoria(nombreCat) {
   const { inicio: inicioMes, fin: finMes } = calcularPeriodo(cursorFecha);
   const catId = categoriasCache.find((c) => c.nombre === nombreCat)?.id;
 
-  const { data } = await sb.from('gastos').select('*').eq('categoria_id', catId).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
+  const { data: dataTodos } = await sb.from('gastos').select('*').eq('categoria_id', catId).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes).order('fecha', { ascending: false });
+  const data = (dataTodos || []).filter((g) => modoRosco === 'todo' || !esFijo(g));
   const total = (data || []).reduce((a, g) => a + Number(g.importe), 0);
 
   document.getElementById('modal-cat-titulo').innerHTML = `${iconoSVG(nombreCat, 16)} ${nombreCat} — ${euros(total)}`;
@@ -1501,7 +1542,7 @@ async function exportarCSV(soloPeriodo) {
     }
     if (!filas.length) { alert('No hay gastos que exportar.'); return; }
 
-    const lineas = [['Fecha', 'Tipo', 'Comercio', 'Descripción', 'Categoría', 'Importe (€)']];
+    const lineas = [['Fecha', 'Tipo', 'Fijo/Variable', 'Comercio', 'Descripción', 'Categoría', 'Importe (€)']];
     filas.forEach((g) => {
       let comercio = '', descripcion = g.descripcion || '';
       if (g.origen === 'ticket' && descripcion.includes(' — ')) {
@@ -1509,7 +1550,7 @@ async function exportarCSV(soloPeriodo) {
         comercio = partes.shift();
         descripcion = partes.join(' — ');
       }
-      lineas.push([g.fecha, g.origen, comercio, descripcion, nombreCategoria(g.categoria_id), Number(g.importe).toFixed(2).replace('.', ',')]);
+      lineas.push([g.fecha, g.origen, esFijo(g) ? 'fijo' : 'variable', comercio, descripcion, nombreCategoria(g.categoria_id), Number(g.importe).toFixed(2).replace('.', ',')]);
     });
     // BOM + separador ';' para que Excel en español lo abra bien
     const csv = '\uFEFF' + lineas.map((l) => l.map(csvCelda).join(';')).join('\r\n');
