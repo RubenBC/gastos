@@ -451,6 +451,31 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// ---------------- AJUSTES: menú y subpáginas ----------------
+function mostrarMenuAjustes() {
+  document.querySelectorAll('#view-ajustes .aj-panel').forEach((p) => { p.style.display = 'none'; });
+  document.getElementById('aj-menu').style.display = '';
+  window.scrollTo(0, 0);
+}
+function abrirPanelAjustes(id) {
+  document.getElementById('aj-menu').style.display = 'none';
+  document.querySelectorAll('#view-ajustes .aj-panel').forEach((p) => { p.style.display = p.id === id ? '' : 'none'; });
+  window.scrollTo(0, 0);
+  if (id === 'aj-ingresos') cargarNominaConfig();
+  if (id === 'aj-fijos') cargarFijosConfig();
+  if (id === 'aj-cats') { renderCategorias(); renderPresupuestos(); }
+  if (id === 'aj-seguridad') renderBloqueoAjustes();
+}
+document.querySelectorAll('.aj-row[data-panel]').forEach((r) => r.addEventListener('click', () => abrirPanelAjustes(r.dataset.panel)));
+document.querySelectorAll('.aj-back').forEach((b) => b.addEventListener('click', mostrarMenuAjustes));
+document.getElementById('fijo-nuevo-toggle').addEventListener('click', () => {
+  const f = document.getElementById('fijo-form-wrap');
+  const abrir = f.style.display === 'none';
+  f.style.display = abrir ? 'flex' : 'none';
+  document.getElementById('fijo-nuevo-toggle').textContent = abrir ? '✕ Cerrar' : '＋ Nuevo gasto fijo';
+  if (abrir) f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
 // ---------------- NAVEGACIÓN ----------------
 document.querySelectorAll('.navitem').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -460,7 +485,7 @@ document.querySelectorAll('.navitem').forEach((btn) => {
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if (btn.dataset.view === 'resumen') cargarDashboard();
     if (btn.dataset.view === 'tickets') cargarTickets();
-    if (btn.dataset.view === 'ajustes') { cargarNominaConfig(); cargarFijosConfig(); renderCategorias(); renderPresupuestos(); renderBloqueoAjustes(); }
+    if (btn.dataset.view === 'ajustes') mostrarMenuAjustes();
   });
 });
 
