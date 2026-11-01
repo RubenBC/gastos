@@ -803,12 +803,13 @@ document.getElementById('sheet-manual').addEventListener('click', () => { docume
 document.getElementById('file-input').addEventListener('change', (e) => procesarFotoTicket(e));
 document.getElementById('file-input-gallery').addEventListener('change', (e) => procesarFotoTicket(e));
 
-// Reduce la foto a 1600 px de lado mayor (JPEG 82 %) para subirla rápido. Si algo falla, usa la original.
+// Reduce la foto (lado corto ≤1200 px, lado largo ≤3000 px, JPEG 82 %) para subirla rápido. Si algo falla, usa la original.
 async function comprimirImagen(file) {
   try {
     if (!file.type.startsWith('image/') || file.size < 600 * 1024) return file;
     const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
-    const escala = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    // Lado corto como máximo 1200 px y lado largo 3000 px: los tickets largos conservan el ancho y la letra
+    const escala = Math.min(1, 1200 / Math.min(bmp.width, bmp.height), 3000 / Math.max(bmp.width, bmp.height));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bmp.width * escala);
     canvas.height = Math.round(bmp.height * escala);
