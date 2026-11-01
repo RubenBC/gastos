@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=5.3.1">
+<link rel="manifest" href="./manifest.json?v=5.4.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
   :root{
@@ -85,10 +85,10 @@
   .donut-hero canvas{position:absolute; inset:0; width:100% !important; height:100% !important; z-index:3;}
   .donut-center{z-index:1; position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none;}
   .donut-ingresos{font-size:12px; font-weight:600; color:var(--md-success); opacity:0.85;}
-  .donut-gastos-label{font-size:10.5px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.05em; margin-top:6px;}
+  .donut-gastos-label{font-size:11.5px; color:var(--md-on-surface-variant); text-transform:uppercase; letter-spacing:0.05em; margin-top:6px;}
   .donut-gastos-amt{font-size:22px; font-weight:700; color:var(--md-on-surface); margin-top:2px;}
   .donut-ahorro{font-size:13px; font-weight:700; color:#E8A05C; margin-top:8px;}
-  .donut-ahorro-label{font-size:9.5px; color:#E8A05C; opacity:0.75; text-transform:uppercase; letter-spacing:0.04em;}
+  .donut-ahorro-label{font-size:11px; color:#E8A05C; opacity:0.75; text-transform:uppercase; letter-spacing:0.04em;}
 
   .legend-list{display:flex; flex-direction:column; gap:2px; margin:14px 0 4px;}
   .legend-row{display:flex; align-items:center; gap:12px; cursor:pointer; padding:10px 4px;}
@@ -121,7 +121,7 @@
   .ticket-card.open .ticket-card-detail{display:block;}
   .ticket-item-row{display:flex; justify-content:space-between; padding:7px 0; font-size:12.5px; color:var(--md-on-surface); cursor:pointer; border-bottom:1px solid var(--md-outline-variant);}
   .ticket-item-row:last-child{border-bottom:none;}
-  .manual-tag{font-size:9.5px; color:var(--md-on-surface-variant); font-weight:500;}
+  .manual-tag{font-size:11px; color:var(--md-on-surface-variant); font-weight:500;}
 
   /* ---------- FAB + bottom sheet ---------- */
   .fab{
@@ -189,9 +189,9 @@
   .fijo-name{font-size:14.5px; font-weight:700; color:var(--md-on-surface);}
   .fijo-cat{font-size:11px; color:var(--md-on-surface-variant); margin-top:2px;}
   .fijo-amt{font-weight:700; color:var(--md-on-surface); text-align:right; white-space:nowrap;}
-  .fijo-amt .approx{font-size:10px; color:var(--md-on-surface-variant); font-weight:500; display:block;}
+  .fijo-amt .approx{font-size:11px; color:var(--md-on-surface-variant); font-weight:500; display:block;}
   .fijo-bottom{display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid var(--md-outline-variant);}
-  .fijo-badge{font-size:10.5px; font-weight:700; text-transform:uppercase; padding:5px 11px; border-radius:100px; border:none;}
+  .fijo-badge{font-size:11.5px; font-weight:700; text-transform:uppercase; padding:5px 11px; border-radius:100px; border:none;}
   .badge-confirmar{background:var(--md-error-container); color:var(--md-on-error-container);}
   .badge-proximo{background:var(--md-secondary-container); color:var(--md-on-secondary-container);}
   .badge-pagado{background:rgba(168,210,160,0.2); color:var(--md-success);}
@@ -235,7 +235,7 @@
   .bud-bar{height:6px; border-radius:6px; background:var(--md-surface-container-highest); margin-top:6px; overflow:hidden;}
   .bud-fill{height:100%; border-radius:6px; background:var(--md-primary);}
   .bud-fill.aviso{background:#E8A05C;} .bud-fill.pasado{background:var(--md-error);}
-  .bud-txt{font-size:10.5px; color:var(--md-on-surface-variant); margin-top:3px;}
+  .bud-txt{font-size:11.5px; color:var(--md-on-surface-variant); margin-top:3px;}
   .bud-txt.aviso{color:#E8A05C;} .bud-txt.pasado{color:var(--md-error);}
   .bud-row{display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--md-surface-container); border-radius:18px; margin-bottom:7px;}
   .bud-row .cat-name{flex:1;}
@@ -266,13 +266,13 @@
   .empty-btn{margin-top:14px; background:var(--md-primary); color:var(--md-on-primary); border:none; border-radius:100px; padding:12px 22px; font-weight:700; font-size:13.5px; font-family:inherit;}
   .ticket-card{touch-action:pan-y; transition:transform .18s ease, opacity .18s ease;}
   .donut-hero-wrap{touch-action:pan-y;}
-  .swipe-hint{font-size:10.5px; color:var(--md-on-surface-variant); text-align:center; margin:2px 0 8px; opacity:.7;}
+  .swipe-hint{font-size:11.5px; color:var(--md-on-surface-variant); text-align:center; margin:2px 0 8px; opacity:.7;}
   .precio-card{background:var(--md-surface-container); border-radius:22px; padding:16px; margin-bottom:12px;}
   .precio-titulo{font-size:12px; font-weight:700; color:var(--md-primary); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;}
   .precio-stats{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
   .precio-stat{background:var(--md-surface-container-high); border-radius:14px; padding:10px 12px;}
   .precio-stat b{display:block; font-size:15px; color:var(--md-on-surface);}
-  .precio-stat span{font-size:10.5px; color:var(--md-on-surface-variant);}
+  .precio-stat span{font-size:11.5px; color:var(--md-on-surface-variant);}
 
   /* ---------- Bloqueo ---------- */
   #lock-screen{position:fixed; inset:0; z-index:200; background:var(--md-background); display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center;}
@@ -295,6 +295,16 @@
   .item-name-edit:empty::before{content:attr(data-placeholder); color:var(--md-on-surface-variant); opacity:.6;}
   .item-del{background:none; border:none; color:var(--md-on-surface-variant); font-size:15px; padding:2px 6px; opacity:.7;}
   .btn-add-item{width:100%; margin-top:10px; background:none; border:1px dashed var(--md-outline-variant); border-radius:12px; color:var(--md-primary); font-weight:700; font-size:13px; padding:11px; font-family:inherit;}
+
+  /* ---------- Diálogos propios y sin conexión ---------- */
+  .dlg-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:24px; z-index:300;}
+  .dlg-overlay.open{display:flex;}
+  .dlg-box{background:var(--md-surface-container-high); border-radius:28px; padding:24px 22px 18px; width:100%; max-width:380px; animation:subir .18s ease-out;}
+  .dlg-msg{font-size:15px; line-height:1.5; color:var(--md-on-surface); white-space:pre-line;}
+  .dlg-input{width:100%; margin-top:16px; padding:14px 15px; border-radius:14px; border:1px solid var(--md-outline-variant); background:var(--md-surface-container); color:var(--md-on-surface); font-size:16px; font-family:inherit;}
+  .dlg-actions{display:flex; gap:10px; margin-top:20px;}
+  .btn-filled.peligro{background:var(--md-error); color:var(--md-on-error);}
+  .offline-banner{position:fixed; top:0; left:0; right:0; z-index:95; background:#E8A05C; color:#2B1A08; font-size:12.5px; font-weight:700; text-align:center; padding:calc(8px + env(safe-area-inset-top)) 12px 8px;}
 
   /* ---------- Ajustes: menú y subpáginas ---------- */
   .aj-row{display:flex; align-items:center; gap:14px; background:var(--md-surface-container); border-radius:20px; padding:14px 16px; margin-bottom:8px; cursor:pointer;}
@@ -328,6 +338,7 @@
     <input type="email" id="login-email" placeholder="Email" autocomplete="username">
     <input type="password" id="login-password" placeholder="Contraseña" autocomplete="current-password">
     <button id="login-btn">Entrar</button>
+    <button type="button" class="btn-text" id="login-olvido" style="width:100%; margin-top:8px; background:none; color:var(--md-on-surface-variant);">¿Olvidaste la contraseña?</button>
     <div id="login-error"></div>
   </div>
 </div>
@@ -336,9 +347,9 @@
   <div class="topbar">
     <div class="topbar-title">Gastos <span id="topbar-version" style="font-weight:500; opacity:0.6; text-transform:none; letter-spacing:0; font-size:12px; margin-left:6px;"></span></div>
     <div class="month-nav">
-      <button class="month-nav-btn" id="mes-anterior">‹</button>
+      <button class="month-nav-btn" id="mes-anterior" aria-label="Periodo anterior">‹</button>
       <div class="topbar-month" id="topbar-month">—</div>
-      <button class="month-nav-btn" id="mes-siguiente">›</button>
+      <button class="month-nav-btn" id="mes-siguiente" aria-label="Periodo siguiente">›</button>
     </div>
   </div>
 
@@ -416,7 +427,7 @@
       <div class="search-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
         <input type="search" id="buscar-input" placeholder="Buscar gastos (comercio, artículo, categoría)">
-        <button class="search-clear" id="buscar-limpiar">✕</button>
+        <button class="search-clear" id="buscar-limpiar" aria-label="Limpiar búsqueda">✕</button>
       </div>
       <div id="buscar-resultados" style="display:none;"></div>
       <div id="tickets-normal">
@@ -461,7 +472,7 @@
       <div class="aj-row" id="aj-tema-row" style="cursor:default;">
         <div class="aj-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></div>
         <div class="aj-txt"><div class="aj-t">Modo claro</div><div class="aj-s">Cambia los colores de la app</div></div>
-        <button class="m3-switch off" id="tema-toggle"></button>
+        <button class="m3-switch off" id="tema-toggle" role="switch" aria-label="Modo claro"></button>
       </div>
       <div class="section-title">Cuenta</div>
       <button class="btn-logout" id="logout-btn">Cerrar sesión</button>
@@ -531,7 +542,7 @@
             <div class="settings-item-label">Bloqueo con PIN</div>
             <div class="settings-item-sub">Pide un PIN de 4 dígitos al abrir la app</div>
           </div>
-          <button class="m3-switch off" id="lock-toggle"></button>
+          <button class="m3-switch off" id="lock-toggle" role="switch" aria-label="Bloqueo con PIN"></button>
         </div>
         <div id="lock-opciones" style="display:none; gap:10px; flex-wrap:wrap;">
           <button class="btn-tonal" id="lock-cambiar" style="flex:1;">Cambiar PIN</button>
@@ -542,7 +553,7 @@
     </div>
   </div>
 
-  <button class="fab" id="fab-add">＋</button>
+  <button class="fab" id="fab-add" aria-label="Añadir gasto">＋</button>
 
   <div class="navbar">
     <button class="navitem active" data-view="resumen">
@@ -622,7 +633,7 @@
 
 <div class="modal-overlay" id="modal-categoria-detalle">
   <div class="modal-box">
-    <div class="modal-title"><span id="modal-cat-titulo">Categoría</span><button class="modal-close-x" id="cerrar-modal-cat">✕</button></div>
+    <div class="modal-title"><span id="modal-cat-titulo">Categoría</span><button class="modal-close-x" id="cerrar-modal-cat" aria-label="Cerrar">✕</button></div>
     <div id="modal-cat-contenido"></div>
   </div>
 </div>
@@ -637,10 +648,23 @@
   <button class="btn-text" id="lock-forgot" style="display:none;">¿Olvidaste el PIN? Cerrar sesión</button>
 </div>
 
+<div class="offline-banner" id="offline-banner" style="display:none;">Sin conexión · no se guardarán cambios hasta que vuelva la red</div>
+
+<div class="dlg-overlay" id="dlg" role="dialog" aria-modal="true">
+  <div class="dlg-box">
+    <div class="dlg-msg" id="dlg-msg"></div>
+    <input id="dlg-input" class="dlg-input" style="display:none;">
+    <div class="dlg-actions">
+      <button class="btn-tonal" id="dlg-cancel">Cancelar</button>
+      <button class="btn-filled" id="dlg-ok">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span class="toast-msg" id="toast-msg"></span><button class="toast-undo" id="toast-undo">Deshacer</button></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
-<script src="./config.js?v=5.3.1"></script>
-<script src="./app.js?v=5.3.1"></script>
+<script src="./config.js?v=5.4.0"></script>
+<script src="./app.js?v=5.4.0"></script>
 </body>
 </html>

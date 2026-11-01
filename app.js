@@ -160,6 +160,46 @@ function fechaCobroEnPeriodo(dia, inicioISO) {
   if (f < inicioISO) { m += 1; if (m > 11) { m = 0; y += 1; } f = fechaLocal(y, m, Math.min(dia, ultimoDiaMes(y, m))); }
   return f;
 }
+// ---------------- DIÁLOGOS PROPIOS (sustituyen a alert/confirm/prompt) ----------------
+let colaDialogo = Promise.resolve();
+function dialogo({ mensaje, aceptar = 'Aceptar', cancelar = null, input = null, peligro = false }) {
+  const mostrar = () => new Promise((resolver) => {
+    const ov = document.getElementById('dlg');
+    document.getElementById('dlg-msg').textContent = mensaje;
+    const campo = document.getElementById('dlg-input');
+    campo.style.display = input ? '' : 'none';
+    if (input) {
+      campo.type = input.tipo || 'text';
+      campo.inputMode = input.inputMode || '';
+      campo.value = input.valor ?? '';
+      campo.placeholder = input.placeholder || '';
+    }
+    const bOk = document.getElementById('dlg-ok');
+    const bNo = document.getElementById('dlg-cancel');
+    bOk.textContent = aceptar;
+    bOk.classList.toggle('peligro', peligro);
+    bNo.style.display = cancelar ? '' : 'none';
+    bNo.textContent = cancelar || '';
+    const cerrar = (valor) => {
+      ov.classList.remove('open');
+      bOk.onclick = bNo.onclick = campo.onkeydown = null;
+      resolver(valor);
+    };
+    bOk.onclick = () => cerrar(input ? campo.value : true);
+    bNo.onclick = () => cerrar(input ? null : false);
+    campo.onkeydown = (e) => { if (e.key === 'Enter') bOk.click(); };
+    ov.classList.add('open');
+    if (input) setTimeout(() => { campo.focus(); campo.select(); }, 50);
+  });
+  // Si ya hay uno abierto, el siguiente espera su turno
+  const p = colaDialogo.then(mostrar);
+  colaDialogo = p.catch(() => {});
+  return p;
+}
+function avisar(mensaje) { return dialogo({ mensaje }); }
+function confirmar(mensaje, opciones = {}) { return dialogo({ mensaje, aceptar: opciones.aceptar || 'Aceptar', cancelar: opciones.cancelar || 'Cancelar', peligro: !!opciones.peligro }); }
+function pedirValor(mensaje, valor, opciones = {}) { return dialogo({ mensaje, aceptar: 'Guardar', cancelar: 'Cancelar', input: { valor, ...opciones } }); }
+
 function vibrar() { try { navigator.vibrate && navigator.vibrate(15); } catch (e) {} }
 function refrescarTodo() {
   cargarDashboard();
@@ -225,13 +265,13 @@ document.getElementById('mes-siguiente').addEventListener('click', () => {
 });
 
 document.getElementById('reiniciar-periodo-btn').addEventListener('click', async () => {
-  if (!confirm('¿Reiniciar el periodo hoy? A partir de ahora, "este mes" contará desde hoy. El periodo anterior queda guardado tal cual, podrás seguir viéndolo con la flecha ‹.')) return;
-  if (periodosCache.includes(hoyISO())) { alert('Ya has reiniciado el periodo hoy.'); return; }
-  try { await reiniciarPeriodoHoy(); } catch (err) { alert('No se pudo reiniciar: ' + err.message); return; }
+  if (!await confirmar('¿Reiniciar el periodo hoy? A partir de ahora, "este mes" contará desde hoy. El periodo anterior queda guardado tal cual, podrás seguir viéndolo con la flecha ‹.', { aceptar: 'Reiniciar' })) return;
+  if (periodosCache.includes(hoyISO())) { avisar('Ya has reiniciado el periodo hoy.'); return; }
+  try { await reiniciarPeriodoHoy(); } catch (err) { avisar('No se pudo reiniciar: ' + err.message); return; }
   refrescarVistaActual();
   cargarNominaConfig();
   cargarFijosConfig();
-  alert('Periodo reiniciado. Ya puedes meter la nómina de este nuevo periodo.');
+  mostrarToast('Periodo reiniciado');
 });
 
 function poblarSelectCategorias(sel, categoriaIdActual) {
@@ -261,6 +301,24 @@ document.getElementById('login-btn').addEventListener('click', async () => {
     return;
   }
   mostrarApp();
+});
+
+['login-email', 'login-password'].forEach((id) => document.getElementById(id).addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('login-btn').click();
+}));
+document.getElementById('login-olvido').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim() || CONFIG.ADMIN_EMAIL;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if (error) { avisar('No se pudo enviar el correo: ' + error.message); return; }
+  avisar(`Te he enviado un correo a ${email} con un enlace para poner una contraseña nueva. Ábrelo en este móvil.`);
+});
+// Al volver del enlace del correo, se pide la contraseña nueva
+sb.auth.onAuthStateChange(async (evento) => {
+  if (evento !== 'PASSWORD_RECOVERY') return;
+  const nueva = await pedirValor('Escribe tu contraseña nueva (mínimo 6 caracteres)', '', { tipo: 'password' });
+  if (!nueva) return;
+  const { error } = await sb.auth.updateUser({ password: nueva });
+  avisar(error ? 'No se pudo cambiar: ' + error.message : 'Contraseña cambiada.');
 });
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -406,7 +464,7 @@ async function intentarHuella() {
 }
 
 async function activarHuella() {
-  if (!window.PublicKeyCredential) { alert('Este navegador no permite huella.'); return; }
+  if (!window.PublicKeyCredential) { avisar('Este navegador no permite huella.'); return; }
   try {
     const cred = await navigator.credentials.create({ publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -420,7 +478,7 @@ async function activarHuella() {
     renderBloqueoAjustes();
     mostrarToast('Huella activada');
   } catch (e) {
-    alert('No se pudo activar la huella: ' + (e.message || e.name));
+    avisar('No se pudo activar la huella: ' + (e.message || e.name));
   }
 }
 
@@ -451,7 +509,7 @@ document.getElementById('lock-huella').addEventListener('click', () => {
 });
 document.getElementById('lock-cancelar').addEventListener('click', () => { cerrarLock(); renderBloqueoAjustes(); });
 document.getElementById('lock-forgot').addEventListener('click', async () => {
-  if (!confirm('Se cerrará la sesión y se quitará el bloqueo. Tendrás que entrar de nuevo con tu contraseña. ¿Seguir?')) return;
+  if (!await confirmar('Se cerrará la sesión y se quitará el bloqueo. Tendrás que entrar de nuevo con tu contraseña. ¿Seguir?', { aceptar: 'Cerrar sesión', peligro: true })) return;
   guardarLock(null);
   await sb.auth.signOut();
   location.reload();
@@ -509,7 +567,7 @@ document.querySelectorAll('.navitem').forEach((btn) => {
 // ---------------- CATEGORÍAS ----------------
 async function cargarCategorias() {
   const { data, error } = await sb.from('categorias').select('*').order('orden');
-  if (error) { alert('No se pudieron cargar las categorías: ' + error.message); return; }
+  if (error) { avisar('No se pudieron cargar las categorías: ' + error.message); return; }
   categoriasCache = data;
   asignarColores();
   await cargarPresupuestos();
@@ -542,7 +600,7 @@ function renderPresupuestos() {
         ({ error } = await sb.from('presupuestos').delete().eq('categoria_id', inp.dataset.catId));
         if (!error) delete presupuestosCache[inp.dataset.catId];
       }
-      if (error) { alert('No se pudo guardar el presupuesto (¿has ejecutado anadir-presupuestos.sql?):\n' + error.message); return; }
+      if (error) { avisar('No se pudo guardar el presupuesto (¿has ejecutado anadir-presupuestos.sql?):\n' + error.message); return; }
       mostrarToast('Presupuesto guardado');
     });
   });
@@ -558,7 +616,7 @@ function renderCategorias() {
       </div>
       <div class="cat-row-right">
         ${c.nombre.toLowerCase() === 'otros' ? '' : `<button class="cat-del" data-del="${c.id}" aria-label="Eliminar">${svgInline(ICONO_PAPELERA, 17)}</button>`}
-        <button class="m3-switch ${c.activa ? '' : 'off'}" data-id="${c.id}" data-activa="${c.activa}"></button>
+        <button class="m3-switch ${c.activa ? '' : 'off'}" data-id="${c.id}" data-activa="${c.activa}" role="switch" aria-checked="${c.activa}" aria-label="Activar ${esc(c.nombre)}"></button>
       </div>
     </div>
   `).join('');
@@ -576,8 +634,8 @@ async function eliminarCategoria(id) {
   const cat = categoriasCache.find((c) => c.id === id);
   const otros = categoriasCache.find((c) => c.nombre.toLowerCase() === 'otros');
   if (!cat) return;
-  if (!otros) { alert('Necesitas la categoría "Otros" para poder eliminar otras: a ella pasarán sus gastos.'); return; }
-  if (!confirm(`¿Eliminar "${cat.nombre}"?\n\nSus gastos, artículos y gastos fijos pasarán a "Otros". Esto no se puede deshacer.`)) return;
+  if (!otros) { avisar('Necesitas la categoría "Otros" para poder eliminar otras: a ella pasarán sus gastos.'); return; }
+  if (!await confirmar(`¿Eliminar "${cat.nombre}"?\n\nSus gastos, artículos y gastos fijos pasarán a "Otros". Esto no se puede deshacer.`, { aceptar: 'Eliminar', peligro: true })) return;
   try {
     for (const tabla of ['gastos', 'ticket_items', 'gastos_fijos']) {
       const { error } = await sb.from(tabla).update({ categoria_id: otros.id }).eq('categoria_id', id);
@@ -587,7 +645,7 @@ async function eliminarCategoria(id) {
     const { error } = await sb.from('categorias').delete().eq('id', id);
     if (error) throw new Error(error.message);
   } catch (err) {
-    alert('No se pudo eliminar la categoría:\n' + err.message);
+    avisar('No se pudo eliminar la categoría:\n' + err.message);
     return;
   }
   await cargarCategorias();
@@ -639,21 +697,21 @@ async function cargarNominaConfig() {
 
 document.getElementById('nomina-guardar').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const importe = parseFloat(document.getElementById('nomina-importe').value);
-  if (!importe) { alert('Pon un importe.'); return; }
+  if (!importe) { avisar('Pon un importe.'); return; }
   // ¿Es la nómina de un periodo nuevo? Si el periodo actual ya lleva más de 20 días, se pregunta
   const inicioActual = calcularPeriodo(hoyISO()).inicio;
   const diasPeriodo = Math.round((new Date(hoyISO() + 'T00:00:00') - new Date(inicioActual + 'T00:00:00')) / 86400000);
-  if (diasPeriodo >= 20 && confirm(`Tu periodo actual empezó hace ${diasPeriodo} días.\n\n¿Acabas de cobrar? Pulsa Aceptar para empezar un periodo nuevo hoy con esta nómina.\nPulsa Cancelar para solo corregir la nómina del periodo actual.`)) {
-    try { await reiniciarPeriodoHoy(); } catch (err) { alert('No se pudo reiniciar el periodo: ' + err.message); return; }
+  if (diasPeriodo >= 20 && await confirmar(`Tu periodo actual empezó hace ${diasPeriodo} días.\n\n¿Acabas de cobrar? Puedes empezar un periodo nuevo hoy con esta nómina, o solo corregir la nómina del periodo actual.`, { aceptar: 'Periodo nuevo', cancelar: 'Solo corregir' })) {
+    try { await reiniciarPeriodoHoy(); } catch (err) { avisar('No se pudo reiniciar el periodo: ' + err.message); return; }
     nominaEsteMesId = null;
     cargarFijosConfig();
   }
   if (nominaEsteMesId) {
     const { error } = await sb.from('ingresos').update({ importe }).eq('id', nominaEsteMesId);
-    if (error) { alert('No se pudo guardar la nómina: ' + error.message); return; }
+    if (error) { avisar('No se pudo guardar la nómina: ' + error.message); return; }
   } else {
     const { data, error } = await sb.from('ingresos').insert({ fecha: hoyISO(), importe, descripcion: 'Nómina' }).select().single();
-    if (error) { alert('No se pudo guardar la nómina: ' + error.message); return; }
+    if (error) { avisar('No se pudo guardar la nómina: ' + error.message); return; }
     nominaEsteMesId = data.id;
   }
   mostrarToast('Nómina guardada · ' + euros(importe));
@@ -705,15 +763,17 @@ async function cargarFijosConfig() {
 async function marcarFijoPagado(btn) {
   const { data: ultimo } = await sb.from('gastos').select('importe').eq('gasto_fijo_id', btn.dataset.fijoId).order('fecha', { ascending: false }).limit(1);
   const sugerido = ultimo?.[0]?.importe ?? btn.dataset.importe;
-  const importe = prompt(`Importe real de "${btn.dataset.nombre}":`, sugerido);
-  if (importe === null) return;
+  const texto = await pedirValor(`Importe real de "${btn.dataset.nombre}"`, String(sugerido).replace('.', ','), { tipo: 'text', inputMode: 'decimal', placeholder: '0,00 €' });
+  if (texto === null) return;
+  const importe = parsePrecio(texto);
+  if (!importe) { avisar('Pon un importe válido.'); return; }
 
   const { error } = await sb.from('gastos').insert({
-    fecha: hoyISO(), importe: parseFloat(importe), categoria_id: btn.dataset.categoriaId,
+    fecha: hoyISO(), importe, categoria_id: btn.dataset.categoriaId,
     descripcion: btn.dataset.nombre, origen: 'fijo', estado: 'confirmado', gasto_fijo_id: btn.dataset.fijoId,
     ...(soportaTipo ? { tipo: btn.dataset.comovar === 'true' ? 'variable' : 'fijo' } : {}),
   });
-  if (error) { alert('No se pudo registrar: ' + error.message); return; }
+  if (error) { avisar('No se pudo registrar: ' + error.message); return; }
   cargarFijosConfig();
   cargarDashboard();
 }
@@ -733,11 +793,11 @@ document.getElementById('add-fijo-btn').addEventListener('click', (ev) => conBot
   const importe = parseFloat(document.getElementById('new-fijo-importe').value);
   const dia = parseInt(document.getElementById('new-fijo-dia').value);
   const esVariable = document.getElementById('new-fijo-variable').checked;
-  if (!nombre || !importe || !dia || !categoriaId) { alert('Rellena todos los campos.'); return; }
+  if (!nombre || !importe || !dia || !categoriaId) { avisar('Rellena todos los campos.'); return; }
 
   const comoVariable = soportaTipo && document.getElementById('new-fijo-comovariable').checked;
   const { error } = await sb.from('gastos_fijos').insert({ nombre, importe_estimado: importe, dia_cobro: dia, categoria_id: categoriaId, importe_es_fijo: !esVariable, ...(soportaTipo ? { cuenta_como_variable: comoVariable } : {}) });
-  if (error) { alert('Error: ' + error.message); return; }
+  if (error) { avisar('Error: ' + error.message); return; }
 
   document.getElementById('new-fijo-nombre').value = '';
   document.getElementById('new-fijo-importe').value = '';
@@ -768,7 +828,7 @@ document.getElementById('fijo-guardar').addEventListener('click', (ev) => conBot
   const importe = parseFloat(document.getElementById('fijo-importe').value);
   const dia = parseInt(document.getElementById('fijo-dia').value);
   const variable = document.getElementById('fijo-variable').checked;
-  if (!nombre || !importe || !dia || !categoriaId) { alert('Rellena todos los campos.'); return; }
+  if (!nombre || !importe || !dia || !categoriaId) { avisar('Rellena todos los campos.'); return; }
 
   const comoVariable = soportaTipo && document.getElementById('fijo-comovariable').checked;
   await sb.from('gastos_fijos').update({ nombre, categoria_id: categoriaId, importe_estimado: importe, dia_cobro: dia, importe_es_fijo: !variable, ...(soportaTipo ? { cuenta_como_variable: comoVariable } : {}) }).eq('id', fijoId);
@@ -783,7 +843,7 @@ document.getElementById('fijo-guardar').addEventListener('click', (ev) => conBot
 document.getElementById('fijo-borrar').addEventListener('click', async () => {
   const fijoId = document.getElementById('modal-fijo').dataset.fijoId;
   const { error } = await sb.from('gastos_fijos').update({ activo: false }).eq('id', fijoId);
-  if (error) { alert('No se pudo borrar: ' + error.message); return; }
+  if (error) { avisar('No se pudo borrar: ' + error.message); return; }
   document.getElementById('modal-fijo').classList.remove('open');
   cargarFijosConfig();
   mostrarToast('Gasto fijo borrado', async () => {
@@ -851,7 +911,7 @@ async function procesarFotoTicket(e) {
     renderRevisarModal();
     cargarPendientes();
   } catch (err) {
-    alert('No se pudo leer el ticket: ' + err.message);
+    avisar('No se pudo leer el ticket: ' + err.message);
   } finally {
     spinner.classList.remove('active');
     e.target.value = '';
@@ -995,9 +1055,9 @@ async function cargarPendientes() {
 
 async function reabrirTicketPendiente(ticketId) {
   const { data: ticket, error: errorTicket } = await sb.from('tickets').select('*').eq('id', ticketId).single();
-  if (errorTicket || !ticket) { alert('No se pudo abrir el ticket: ' + errorTicket?.message); return; }
+  if (errorTicket || !ticket) { avisar('No se pudo abrir el ticket: ' + errorTicket?.message); return; }
   const { data: items, error: errorItems } = await sb.from('ticket_items').select('*').eq('ticket_id', ticketId);
-  if (errorItems) { alert('No se pudieron cargar los artículos: ' + errorItems.message); return; }
+  if (errorItems) { avisar('No se pudieron cargar los artículos: ' + errorItems.message); return; }
 
   ticketActual = { ticket, items: items || [] };
   renderRevisarModal();
@@ -1005,9 +1065,9 @@ async function reabrirTicketPendiente(ticketId) {
 
 async function descartarTicket() {
   if (!ticketActual) return;
-  if (!confirm('¿Descartar este ticket?')) return;
+  if (!await confirmar('¿Descartar este ticket? Se borrará sin guardar.', { aceptar: 'Descartar', peligro: true })) return;
   const { error } = await sb.from('tickets').delete().eq('id', ticketActual.ticket.id);
-  if (error) { alert('No se pudo descartar: ' + error.message); return; }
+  if (error) { avisar('No se pudo descartar: ' + error.message); return; }
   ticketActual = null;
   document.getElementById('modal-revisar').classList.remove('open');
   cargarPendientes();
@@ -1029,11 +1089,11 @@ async function conformarTicket() {
   const totalFinal = Math.round(itemsEditados.reduce((a, i) => a + i.precio, 0) * 100) / 100;
 
   if (itemsEditados.length === 0) {
-    alert('Este ticket no tiene artículos. Añade alguno o descártalo.');
+    avisar('Este ticket no tiene artículos. Añade alguno o descártalo.');
     return;
   }
   if (itemsEditados.some((i) => !i.precio)) {
-    if (!confirm('Hay artículos con precio 0. ¿Guardar igualmente?')) return;
+    if (!await confirmar('Hay artículos con precio 0. ¿Guardar igualmente?', { aceptar: 'Guardar' })) return;
   }
 
   try {
@@ -1081,7 +1141,7 @@ async function conformarTicket() {
     cargarDashboard();
     cargarPendientes();
   } catch (err) {
-    alert('No se pudo conformar el ticket:\n\n' + err.message + '\n\nSigue en pendiente. Puedes volver a intentarlo sin miedo a duplicar.');
+    avisar('No se pudo conformar el ticket:\n\n' + err.message + '\n\nSigue en pendiente. Puedes volver a intentarlo sin miedo a duplicar.');
   }
 }
 
@@ -1090,25 +1150,25 @@ async function borrarTicketCompleto(ticketId) {
   const { data: ticketRow } = await sb.from('tickets').select('*').eq('id', ticketId).single();
   const { data: itemsRows } = await sb.from('ticket_items').select('*').eq('ticket_id', ticketId);
   const { data: gastosRows } = await sb.from('gastos').select('*').eq('ticket_id', ticketId);
-  if (!ticketRow) { alert('No se encontró el ticket.'); return; }
+  if (!ticketRow) { avisar('No se encontró el ticket.'); return; }
 
   const { error: errorGastos } = await sb.from('gastos').delete().eq('ticket_id', ticketId);
-  if (errorGastos) { alert('No se pudo borrar: ' + errorGastos.message); return; }
+  if (errorGastos) { avisar('No se pudo borrar: ' + errorGastos.message); return; }
   const { error: errorTicket } = await sb.from('tickets').delete().eq('id', ticketId);
-  if (errorTicket) { alert('Se borraron los gastos pero no el ticket: ' + errorTicket.message); return; }
+  if (errorTicket) { avisar('Se borraron los gastos pero no el ticket: ' + errorTicket.message); return; }
   vibrar();
   refrescarTodo();
 
   mostrarToast('Ticket borrado', async () => {
     const r1 = await sb.from('tickets').insert(ticketRow);
-    if (r1.error) { alert('No se pudo restaurar el ticket: ' + r1.error.message); return; }
+    if (r1.error) { avisar('No se pudo restaurar el ticket: ' + r1.error.message); return; }
     if (itemsRows && itemsRows.length) {
       const r2 = await sb.from('ticket_items').upsert(itemsRows);
-      if (r2.error) { alert('Ticket restaurado, pero no sus artículos: ' + r2.error.message); }
+      if (r2.error) { avisar('Ticket restaurado, pero no sus artículos: ' + r2.error.message); }
     }
     if (gastosRows && gastosRows.length) {
       const r3 = await sb.from('gastos').insert(gastosRows);
-      if (r3.error) { alert('Ticket restaurado, pero no sus gastos: ' + r3.error.message); return; }
+      if (r3.error) { avisar('Ticket restaurado, pero no sus gastos: ' + r3.error.message); return; }
     }
     refrescarTodo();
     mostrarToast('Ticket restaurado');
@@ -1165,7 +1225,7 @@ document.getElementById('manual-guardar').addEventListener('click', (ev) => conB
   const importe = parseFloat(document.getElementById('manual-importe').value);
   const fecha = document.getElementById('manual-fecha').value;
   const categoriaId = document.getElementById('manual-categoria').value;
-  if (!importe || !fecha || !categoriaId) { alert('Pon el importe y elige una categoría.'); return; }
+  if (!importe || !fecha || !categoriaId) { avisar('Pon el importe y elige una categoría.'); return; }
   if (!descripcion) descripcion = nombreCategoria(categoriaId);
   const extraTipo = soportaTipo ? { tipo: document.getElementById('manual-fijo').checked ? 'fijo' : 'variable' } : {};
 
@@ -1175,7 +1235,7 @@ document.getElementById('manual-guardar').addEventListener('click', (ev) => conB
   } else {
     ({ error } = await sb.from('gastos').insert({ fecha, importe, categoria_id: categoriaId, descripcion, origen: 'manual', estado: 'confirmado', ...extraTipo }));
   }
-  if (error) { alert('Error: ' + error.message); return; }
+  if (error) { avisar('Error: ' + error.message); return; }
 
   try { localStorage.setItem('gastos-ultima-cat', categoriaId); } catch (e) {}
   document.getElementById('modal-manual').classList.remove('open');
@@ -1187,13 +1247,13 @@ document.getElementById('manual-guardar').addEventListener('click', (ev) => conB
 async function borrarGastoConDeshacer(id) {
   const { data: fila } = await sb.from('gastos').select('*').eq('id', id).single();
   const { error } = await sb.from('gastos').delete().eq('id', id);
-  if (error) { alert('No se pudo borrar: ' + error.message); return false; }
+  if (error) { avisar('No se pudo borrar: ' + error.message); return false; }
   vibrar();
   refrescarTodo();
   mostrarToast('Gasto borrado', async () => {
     if (!fila) return;
     const r = await sb.from('gastos').insert(fila);
-    if (r.error) { alert('No se pudo restaurar: ' + r.error.message); return; }
+    if (r.error) { avisar('No se pudo restaurar: ' + r.error.message); return; }
     refrescarTodo();
   });
   return true;
@@ -1211,19 +1271,37 @@ function editarGasto(row) {
 }
 
 // ---------------- RESUMEN (dashboard) ----------------
+let dashboardPeticion = 0;
 async function cargarDashboard() {
-  const { inicio: inicioMes, fin: finMes } = calcularPeriodo(cursorFecha);
+  const miPeticion = ++dashboardPeticion;
+  const { inicio: inicioMes, fin: finMes, esActual } = calcularPeriodo(cursorFecha);
 
-  const { data, error } = await sb.from('gastos').select('*').gte('fecha', inicioMes).lte('fecha', finMes).eq('estado', 'confirmado').order('fecha', { ascending: false });
-  if (error) { alert('No se pudo cargar el resumen: ' + error.message); return; }
+  // Periodo anterior para la comparativa: si el actual está en curso, los mismos días
+  const periodoPrev = calcularPeriodo(addDias(inicioMes, -1));
+  let finPrev = periodoPrev.fin;
+  let textoComp = 'Comparado con el periodo anterior completo';
+  if (esActual) {
+    const dias = Math.round((new Date(hoyISO() + 'T00:00:00') - new Date(inicioMes + 'T00:00:00')) / 86400000) + 1;
+    const corte = addDias(periodoPrev.inicio, dias - 1);
+    if (corte < finPrev) finPrev = corte;
+    textoComp = `Comparado con los primeros ${dias} día${dias > 1 ? 's' : ''} del periodo anterior`;
+  }
 
-  const { data: ingresos, error: errorIngresos } = await sb.from('ingresos').select('*').gte('fecha', inicioMes).lte('fecha', finMes);
-  if (errorIngresos) { alert('No se pudieron cargar los ingresos: ' + errorIngresos.message); return; }
-  const totalIngresos = (ingresos || []).reduce((a, i) => a + Number(i.importe), 0);
+  // Todas las consultas a la vez
+  const [rGastos, rIngresos, rTickets, rPrev] = await Promise.all([
+    sb.from('gastos').select('*').gte('fecha', inicioMes).lte('fecha', finMes).eq('estado', 'confirmado').order('fecha', { ascending: false }),
+    sb.from('ingresos').select('*').gte('fecha', inicioMes).lte('fecha', finMes),
+    sb.from('tickets').select('id, comercio, fecha').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes),
+    sb.from('gastos').select('*').eq('estado', 'confirmado').gte('fecha', periodoPrev.inicio).lte('fecha', finPrev),
+  ]);
+  if (miPeticion !== dashboardPeticion) return; // ya se pidió otro periodo: esta respuesta llega tarde
+  if (rGastos.error) { avisar('No se pudo cargar el resumen: ' + rGastos.error.message); return; }
+  if (rIngresos.error) { avisar('No se pudieron cargar los ingresos: ' + rIngresos.error.message); return; }
 
-  const { data: ticketsMes } = await sb.from('tickets').select('id, comercio, fecha').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
+  const data = rGastos.data;
+  const totalIngresos = (rIngresos.data || []).reduce((a, i) => a + Number(i.importe), 0);
   const comercioPorTicket = {};
-  (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
+  (rTickets.data || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
 
   const total = data.reduce((a, g) => a + Number(g.importe), 0);
   const ahorro = totalIngresos - total;
@@ -1239,30 +1317,15 @@ async function cargarDashboard() {
   lineaFijos.innerHTML = `<span>Fijos del periodo (fuera del rosco)</span><b>${euros(totalFijosPeriodo)}</b>`;
   document.getElementById('r-ahorro').textContent = euros(ahorro);
   document.getElementById('r-ahorro').style.color = ahorro >= 0 ? '#E8A05C' : 'var(--md-error)';
+  document.getElementById('comparativa-hint').textContent = textoComp;
 
   const porCategoria = {};
   dataRosco.forEach((g) => {
     const nombre = nombreCategoria(g.categoria_id);
     porCategoria[nombre] = (porCategoria[nombre] || 0) + Number(g.importe);
   });
-
-  // Periodo anterior, para la comparativa por categoría
-  const periodoPrev = calcularPeriodo(addDias(inicioMes, -1));
-  // Si el periodo está en curso, se compara con los mismos días del periodo anterior
-  const periodoVisto = calcularPeriodo(cursorFecha);
-  let finPrev = periodoPrev.fin;
-  const hintComp = document.getElementById('comparativa-hint');
-  if (periodoVisto.esActual) {
-    const dias = Math.round((new Date(hoyISO() + 'T00:00:00') - new Date(inicioMes + 'T00:00:00')) / 86400000) + 1;
-    const corte = addDias(periodoPrev.inicio, dias - 1);
-    if (corte < finPrev) finPrev = corte;
-    hintComp.textContent = `Comparado con los primeros ${dias} día${dias > 1 ? 's' : ''} del periodo anterior`;
-  } else {
-    hintComp.textContent = 'Comparado con el periodo anterior completo';
-  }
-  const { data: dataPrev } = await sb.from('gastos').select('*').eq('estado', 'confirmado').gte('fecha', periodoPrev.inicio).lte('fecha', finPrev);
   const prevPorCategoria = {};
-  (dataPrev || []).filter((g) => modoRosco === 'todo' || !esFijo(g)).forEach((g) => {
+  (rPrev.data || []).filter((g) => modoRosco === 'todo' || !esFijo(g)).forEach((g) => {
     const nombre = nombreCategoria(g.categoria_id);
     prevPorCategoria[nombre] = (prevPorCategoria[nombre] || 0) + Number(g.importe);
   });
@@ -1349,7 +1412,7 @@ document.getElementById('ahorro-header').addEventListener('click', () => {
 
 document.getElementById('ahorro-guardar').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const saldo = parseFloat(document.getElementById('ahorro-importe').value);
-  if (isNaN(saldo)) { alert('Pon el saldo actual.'); return; }
+  if (isNaN(saldo)) { avisar('Pon el saldo actual.'); return; }
 
   let error;
   if (ahorroEstePeriodoId) {
@@ -1357,7 +1420,7 @@ document.getElementById('ahorro-guardar').addEventListener('click', (ev) => conB
   } else {
     ({ error } = await sb.from('ahorros').insert({ fecha: hoyISO(), saldo }));
   }
-  if (error) { alert('No se pudo guardar: ' + error.message); return; }
+  if (error) { avisar('No se pudo guardar: ' + error.message); return; }
   cargarAhorroResumen();
 }));
 
@@ -1384,7 +1447,7 @@ async function cargarFijosResumen(gastosDelMes) {
       <div class="ticket-item-row" style="align-items:center;">
         <span style="display:flex; align-items:center; gap:8px;">${iconoSVG(nombreCategoria(f.categoria_id), 15)} ${esc(f.nombre)}</span>
         <span style="display:flex; align-items:center; gap:8px;">
-          <span class="fijo-badge ${badgeClass}" style="font-size:9.5px; padding:3px 8px;">${badgeText}</span>
+          <span class="fijo-badge ${badgeClass}" style="font-size:11px; padding:3px 8px;">${badgeText}</span>
           ${euros(f.importe_estimado)}
         </span>
       </div>
@@ -1520,7 +1583,7 @@ function renderMovimientos(data, comercioPorTicket, containerId, incluirFijos) {
             </div>
             <div class="ticket-card-amt">${euros(e.total)}</div>
             <span class="ticket-chevron">▾</span>
-            <button class="ticket-delete-btn" data-ticket-id="${e.ticketId}">${svgInline(ICONO_PAPELERA, 15)}</button>
+            <button class="ticket-delete-btn" data-ticket-id="${e.ticketId}" aria-label="Borrar ticket">${svgInline(ICONO_PAPELERA, 15)}</button>
           </div>
           <div class="ticket-card-detail">
             ${e.items.map((it) => `
@@ -1614,14 +1677,20 @@ activarSwipeBorrar(document.getElementById('tickets-detalle'));
 // ---------------- TICKETS (pestaña) ----------------
 const ETIQUETAS_TICKETS = ['Alimentación', 'Higiene personal', 'Limpieza', 'Otros'];
 
+let ticketsPeticion = 0;
 async function cargarTickets() {
+  const miPeticion = ++ticketsPeticion;
   const { inicio: inicioMes, fin: finMes } = calcularPeriodo(cursorFecha);
 
-  const { data, error } = await sb.from('gastos').select('*').in('origen', ['ticket', 'manual']).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
-  if (error) { alert('No se pudieron cargar los tickets: ' + error.message); return; }
-
-  const { data: ticketsMes, error: errorTickets } = await sb.from('tickets').select('id, comercio, fecha').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes);
-  if (errorTickets) { alert('No se pudieron cargar los tickets: ' + errorTickets.message); return; }
+  const [rG, rT] = await Promise.all([
+    sb.from('gastos').select('*').in('origen', ['ticket', 'manual']).eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes),
+    sb.from('tickets').select('id, comercio, fecha').eq('estado', 'confirmado').gte('fecha', inicioMes).lte('fecha', finMes),
+  ]);
+  if (miPeticion !== ticketsPeticion) return;
+  const { data, error } = rG;
+  if (error) { avisar('No se pudieron cargar los tickets: ' + error.message); return; }
+  const { data: ticketsMes, error: errorTickets } = rT;
+  if (errorTickets) { avisar('No se pudieron cargar los tickets: ' + errorTickets.message); return; }
   const comercioPorTicket = {};
   (ticketsMes || []).forEach((t) => { comercioPorTicket[t.id] = t.comercio; });
 
@@ -1687,7 +1756,7 @@ async function exportarCSV(soloPeriodo) {
       filas.push(...data);
       if (data.length < tamano) break;
     }
-    if (!filas.length) { alert('No hay gastos que exportar.'); return; }
+    if (!filas.length) { avisar('No hay gastos que exportar.'); return; }
 
     const lineas = [['Fecha', 'Tipo', 'Fijo/Variable', 'Comercio', 'Descripción', 'Categoría', 'Importe (€)']];
     filas.forEach((g) => {
@@ -1712,7 +1781,7 @@ async function exportarCSV(soloPeriodo) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     mostrarToast(`Exportados ${filas.length} gastos`);
   } catch (err) {
-    alert('No se pudo exportar: ' + err.message);
+    avisar('No se pudo exportar: ' + err.message);
   } finally {
     btns.forEach((b) => { b.disabled = false; });
   }
@@ -1811,6 +1880,14 @@ function dibujarPrecios(q, data) {
     });
   } catch (err) { console.error(err); }
 }
+
+// ---------------- SIN CONEXIÓN ----------------
+function actualizarConexion() {
+  document.getElementById('offline-banner').style.display = navigator.onLine ? 'none' : 'block';
+}
+window.addEventListener('online', () => { actualizarConexion(); if (document.getElementById('app').style.display === 'flex') refrescarVistaActual(); });
+window.addEventListener('offline', actualizarConexion);
+actualizarConexion();
 
 // ---------------- ARRANQUE ----------------
 init();

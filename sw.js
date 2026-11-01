@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gastos-v5.3.1';
+const CACHE_NAME = 'gastos-v5.4.0';
 const APP_SHELL = [
   './',
   './index.html',
@@ -36,8 +36,11 @@ self.addEventListener('fetch', (event) => {
       return (
         cached ||
         fetch(event.request).then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          // Solo se guardan respuestas buenas (o de otros dominios, que llegan opacas)
+          if (event.request.method === 'GET' && (response.ok || response.type === 'opaque')) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
           return response;
         }).catch(() => cached)
       );
