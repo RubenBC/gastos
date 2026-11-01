@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Gastos</title>
-<link rel="manifest" href="./manifest.json?v=5.2.1">
+<link rel="manifest" href="./manifest.json?v=5.3.0">
 <meta name="theme-color" content="#101A13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=Roboto+Flex:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -288,6 +288,14 @@
   .shake{animation:sacudir .3s;}
   @keyframes sacudir{25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
 
+  /* ---------- Revisar ticket: fecha y artículos ---------- */
+  .fecha-edit{width:100%; margin-top:6px; padding:9px 11px; border-radius:12px; border:1px solid var(--md-outline-variant); background:var(--md-surface-container-high); color:var(--md-on-surface); font-size:13px; font-family:inherit;}
+  .item-row1{display:flex; align-items:flex-start; gap:8px;}
+  .item-row1 .item-name-edit{flex:1;}
+  .item-name-edit:empty::before{content:attr(data-placeholder); color:var(--md-on-surface-variant); opacity:.6;}
+  .item-del{background:none; border:none; color:var(--md-on-surface-variant); font-size:15px; padding:2px 6px; opacity:.7;}
+  .btn-add-item{width:100%; margin-top:10px; background:none; border:1px dashed var(--md-outline-variant); border-radius:12px; color:var(--md-primary); font-weight:700; font-size:13px; padding:11px; font-family:inherit;}
+
   /* ---------- Ajustes: menú y subpáginas ---------- */
   .aj-row{display:flex; align-items:center; gap:14px; background:var(--md-surface-container); border-radius:20px; padding:14px 16px; margin-bottom:8px; cursor:pointer;}
   .aj-row:active{background:var(--md-surface-container-high);}
@@ -357,6 +365,7 @@
       </div>
 
       <div class="legend-list" id="legend-list"></div>
+      <div class="hint-text" id="comparativa-hint" style="margin:0 4px 6px;"></div>
       <div class="fijos-linea" id="fijos-linea" style="display:none;"></div>
 
       <div class="spinner" id="capture-spinner"><span class="spinner-dot"></span><span class="spinner-dot"></span><span class="spinner-dot"></span> Leyendo ticket con IA…</div>
@@ -630,8 +639,8 @@
 
 <div class="toast" id="toast"><span class="toast-msg" id="toast-msg"></span><button class="toast-undo" id="toast-undo">Deshacer</button></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./config.js?v=5.2.1"></script>
-<script src="./app.js?v=5.2.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<script src="./config.js?v=5.3.0"></script>
+<script src="./app.js?v=5.3.0"></script>
 </body>
 </html>

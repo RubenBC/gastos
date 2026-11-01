@@ -226,14 +226,8 @@ document.getElementById('mes-siguiente').addEventListener('click', () => {
 
 document.getElementById('reiniciar-periodo-btn').addEventListener('click', async () => {
   if (!confirm('¿Reiniciar el periodo hoy? A partir de ahora, "este mes" contará desde hoy. El periodo anterior queda guardado tal cual, podrás seguir viéndolo con la flecha ‹.')) return;
-  const { error } = await sb.from('periodos').insert({ fecha_inicio: hoyISO() });
-  if (error) {
-    if (error.code === '23505') alert('Ya has reiniciado el periodo hoy.');
-    else alert('No se pudo reiniciar: ' + error.message);
-    return;
-  }
-  await cargarPeriodos();
-  cursorFecha = hoyISO();
+  if (periodosCache.includes(hoyISO())) { alert('Ya has reiniciado el periodo hoy.'); return; }
+  try { await reiniciarPeriodoHoy(); } catch (err) { alert('No se pudo reiniciar: ' + err.message); return; }
   refrescarVistaActual();
   cargarNominaConfig();
   cargarFijosConfig();
@@ -614,6 +608,14 @@ document.getElementById('add-cat-btn').addEventListener('click', (ev) => conBoto
 }));
 
 // ---------------- NÓMINA ----------------
+let nominaEsteMesFecha = null;
+async function reiniciarPeriodoHoy() {
+  const { error } = await sb.from('periodos').insert({ fecha_inicio: hoyISO() });
+  if (error && error.code !== '23505') throw new Error(error.message);
+  await cargarPeriodos();
+  cursorFecha = hoyISO();
+  actualizarTopbarMes();
+}
 async function cargarNominaConfig() {
   const rangoActual = calcularPeriodo(hoyISO());
   const rangoAnterior = calcularPeriodo(addDias(rangoActual.inicio, -1));
@@ -624,10 +626,12 @@ async function cargarNominaConfig() {
   const hint = document.getElementById('nomina-hint');
   if (esteMes && esteMes.length) {
     nominaEsteMesId = esteMes[0].id;
+    nominaEsteMesFecha = esteMes[0].fecha;
     document.getElementById('nomina-importe').value = esteMes[0].importe;
-    hint.textContent = 'Ya la registraste este periodo. Puedes corregirla.';
+    hint.textContent = `Registrada el ${new Date(esteMes[0].fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}. Puedes corregirla, o si acabas de cobrar, guarda la nueva y te preguntará si empiezas periodo.`;
   } else {
     nominaEsteMesId = null;
+    nominaEsteMesFecha = null;
     document.getElementById('nomina-importe').value = mesAnterior?.[0]?.importe || '';
     hint.textContent = mesAnterior?.length ? `Precargada con la del periodo pasado (${euros(mesAnterior[0].importe)}). Ajústala y guarda.` : 'Todavía no has metido ninguna nómina.';
   }
@@ -636,6 +640,14 @@ async function cargarNominaConfig() {
 document.getElementById('nomina-guardar').addEventListener('click', (ev) => conBoton(ev.currentTarget, async () => {
   const importe = parseFloat(document.getElementById('nomina-importe').value);
   if (!importe) { alert('Pon un importe.'); return; }
+  // ¿Es la nómina de un periodo nuevo? Si el periodo actual ya lleva más de 20 días, se pregunta
+  const inicioActual = calcularPeriodo(hoyISO()).inicio;
+  const diasPeriodo = Math.round((new Date(hoyISO() + 'T00:00:00') - new Date(inicioActual + 'T00:00:00')) / 86400000);
+  if (diasPeriodo >= 20 && confirm(`Tu periodo actual empezó hace ${diasPeriodo} días.\n\n¿Acabas de cobrar? Pulsa Aceptar para empezar un periodo nuevo hoy con esta nómina.\nPulsa Cancelar para solo corregir la nómina del periodo actual.`)) {
+    try { await reiniciarPeriodoHoy(); } catch (err) { alert('No se pudo reiniciar el periodo: ' + err.message); return; }
+    nominaEsteMesId = null;
+    cargarFijosConfig();
+  }
   if (nominaEsteMesId) {
     const { error } = await sb.from('ingresos').update({ importe }).eq('id', nominaEsteMesId);
     if (error) { alert('No se pudo guardar la nómina: ' + error.message); return; }
@@ -645,7 +657,8 @@ document.getElementById('nomina-guardar').addEventListener('click', (ev) => conB
     nominaEsteMesId = data.id;
   }
   mostrarToast('Nómina guardada · ' + euros(importe));
-  cargarDashboard();
+  cargarNominaConfig();
+  refrescarVistaActual();
 }));
 
 // ---------------- FIJOS ----------------
@@ -790,6 +803,25 @@ document.getElementById('sheet-manual').addEventListener('click', () => { docume
 document.getElementById('file-input').addEventListener('change', (e) => procesarFotoTicket(e));
 document.getElementById('file-input-gallery').addEventListener('change', (e) => procesarFotoTicket(e));
 
+// Reduce la foto a 1600 px de lado mayor (JPEG 82 %) para subirla rápido. Si algo falla, usa la original.
+async function comprimirImagen(file) {
+  try {
+    if (!file.type.startsWith('image/') || file.size < 600 * 1024) return file;
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const escala = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * escala);
+    canvas.height = Math.round(bmp.height * escala);
+    canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close && bmp.close();
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.82));
+    return blob && blob.size < file.size ? blob : file;
+  } catch (err) {
+    console.warn('No se pudo comprimir, se sube la original', err);
+    return file;
+  }
+}
+
 async function procesarFotoTicket(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -798,11 +830,12 @@ async function procesarFotoTicket(e) {
 
   try {
     const { data: { session } } = await sb.auth.getSession();
+    const archivo = await comprimirImagen(file);
     const nombreOriginal = file.name || `imagen.${(file.type || 'image/jpeg').split('/')[1] || 'jpg'}`;
     const nombreSeguro = nombreOriginal.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${Date.now()}-${nombreSeguro}`;
+    const path = `${Date.now()}-${archivo === file ? nombreSeguro : nombreSeguro.replace(/\.[^.]+$/, '') + '.jpg'}`;
 
-    const { error: uploadError } = await sb.storage.from('tickets').upload(path, file, { contentType: file.type || 'image/jpeg' });
+    const { error: uploadError } = await sb.storage.from('tickets').upload(path, archivo, { contentType: archivo.type || 'image/jpeg' });
     if (uploadError) throw new Error(`Subiendo la imagen: ${uploadError.message}`);
 
     const res = await fetch(`${CONFIG.FUNCTIONS_URL}/leer-ticket`, {
@@ -824,27 +857,49 @@ async function procesarFotoTicket(e) {
   }
 }
 
+function filaItemHTML(item) {
+  return `
+    <div class="item-edit" data-item-id="${item?.id || ''}">
+      <div class="item-row1">
+        <div class="item-name-edit" contenteditable="true" data-field="nombre_articulo" data-placeholder="Nombre del artículo">${esc(item?.nombre_articulo || '')}</div>
+        <button type="button" class="item-del" aria-label="Quitar artículo">✕</button>
+      </div>
+      <div class="item-row2">
+        <select class="item-categoria" data-field="categoria_id"></select>
+        <div class="item-price-edit" contenteditable="true" inputmode="decimal" data-field="precio_total">${item ? Number(item.precio_total).toFixed(2) : '0.00'}</div>
+      </div>
+    </div>`;
+}
+
+function recalcularTotalRevisar() {
+  const box = document.getElementById('modal-revisar-box');
+  const precios = [...box.querySelectorAll('[data-field="precio_total"]')].map((e) => parsePrecio(e.textContent));
+  document.getElementById('modal-total-amount').textContent = euros(precios.reduce((a, b) => a + b, 0));
+}
+
+function prepararFilaItem(itemEl, categoriaId) {
+  poblarSelectCategorias(itemEl.querySelector('.item-categoria'), categoriaId);
+  itemEl.querySelector('[data-field="precio_total"]').addEventListener('input', recalcularTotalRevisar);
+  itemEl.querySelector('.item-del').addEventListener('click', () => {
+    if (itemEl.dataset.itemId) ticketActual.borrados.push(itemEl.dataset.itemId);
+    itemEl.remove();
+    recalcularTotalRevisar();
+  });
+}
+
 function renderRevisarModal() {
   if (!ticketActual) return;
   const { ticket, items } = ticketActual;
+  ticketActual.borrados = [];
   const box = document.getElementById('modal-revisar-box');
   box.innerHTML = `
     <div class="modal-title">Revisar ticket</div>
     <div class="ticket-preview">
       <input class="comercio-edit" id="edit-comercio" value="${esc(ticket.comercio)}">
-      <div class="meta-edit">${ticket.fecha}</div>
+      <input type="date" class="fecha-edit" id="edit-fecha" value="${esc(ticket.fecha)}">
       <hr class="divider">
-      <div id="items-list">
-        ${items.map((item) => `
-          <div class="item-edit" data-item-id="${item.id}">
-            <div class="item-name-edit" contenteditable="true" data-field="nombre_articulo">${esc(item.nombre_articulo)}</div>
-            <div class="item-row2">
-              <select class="item-categoria" data-field="categoria_id"></select>
-              <div class="item-price-edit" contenteditable="true" data-field="precio_total">${Number(item.precio_total).toFixed(2)}</div>
-            </div>
-          </div>
-        `).join('')}
-      </div>
+      <div id="items-list">${items.map(filaItemHTML).join('')}</div>
+      <button type="button" class="btn-add-item" id="btn-add-item">＋ Añadir artículo</button>
       <div class="total-row">
         <div class="total-label">Total</div>
         <div class="total-amount" id="modal-total-amount">${euros(ticket.importe_total)}</div>
@@ -858,15 +913,17 @@ function renderRevisarModal() {
 
   box.querySelectorAll('.item-edit').forEach((itemEl) => {
     const original = items.find((it) => it.id === itemEl.dataset.itemId);
-    poblarSelectCategorias(itemEl.querySelector('.item-categoria'), original?.categoria_id);
+    prepararFilaItem(itemEl, original?.categoria_id);
   });
-
-  box.querySelectorAll('[data-field="precio_total"]').forEach((el) => {
-    el.addEventListener('input', () => {
-      const precios = [...box.querySelectorAll('[data-field="precio_total"]')].map((e) => parseFloat(e.textContent.replace(',', '.')) || 0);
-      document.getElementById('modal-total-amount').textContent = euros(precios.reduce((a, b) => a + b, 0));
-    });
+  document.getElementById('btn-add-item').addEventListener('click', () => {
+    const lista = document.getElementById('items-list');
+    lista.insertAdjacentHTML('beforeend', filaItemHTML(null));
+    const nueva = lista.lastElementChild;
+    const ultimaCat = lista.children.length > 1 ? lista.children[lista.children.length - 2].querySelector('.item-categoria').value : null;
+    prepararFilaItem(nueva, ultimaCat);
+    nueva.querySelector('.item-name-edit').focus();
   });
+  recalcularTotalRevisar();
 
   document.getElementById('btn-descartar').addEventListener('click', descartarTicket);
   document.getElementById('btn-conformar').addEventListener('click', (ev) => conBoton(ev.currentTarget, conformarTicket));
@@ -960,6 +1017,7 @@ async function conformarTicket() {
   const { ticket } = ticketActual;
   const box = document.getElementById('modal-revisar-box');
 
+  const fecha = document.getElementById('edit-fecha').value || ticket.fecha;
   const itemsEditados = [...box.querySelectorAll('#items-list .item-edit')].map((row) => ({
     id: row.dataset.itemId,
     nombre: limpiarTexto(row.querySelector('[data-field="nombre_articulo"]').textContent) || 'Artículo',
@@ -970,13 +1028,32 @@ async function conformarTicket() {
   const totalFinal = Math.round(itemsEditados.reduce((a, i) => a + i.precio, 0) * 100) / 100;
 
   if (itemsEditados.length === 0) {
-    alert('Este ticket no tiene artículos que confirmar. Descártalo y vuelve a escanearlo.');
+    alert('Este ticket no tiene artículos. Añade alguno o descártalo.');
     return;
+  }
+  if (itemsEditados.some((i) => !i.precio)) {
+    if (!confirm('Hay artículos con precio 0. ¿Guardar igualmente?')) return;
   }
 
   try {
-    // 1. Artículos: todas las actualizaciones a la vez
-    const resultados = await Promise.all(itemsEditados.map((item) =>
+    // 1. Artículos: quitados, nuevos y editados, todo a la vez
+    const borrados = ticketActual.borrados || [];
+    if (borrados.length) {
+      const { error } = await sb.from('ticket_items').delete().in('id', borrados);
+      if (error) throw new Error(`Quitando artículos: ${error.message}`);
+      ticketActual.borrados = [];
+    }
+    const nuevos = itemsEditados.filter((i) => !i.id);
+    if (nuevos.length) {
+      const { data: creados, error } = await sb.from('ticket_items').insert(nuevos.map((i) => ({
+        ticket_id: ticket.id, categoria_id: i.categoriaId, nombre_articulo: i.nombre, cantidad: 1, precio_total: i.precio,
+      }))).select('id');
+      if (error) throw new Error(`Añadiendo artículos: ${error.message}`);
+      // Guardamos el id para que un reintento no los vuelva a crear
+      const filasNuevas = [...box.querySelectorAll('#items-list .item-edit')].filter((r) => !r.dataset.itemId);
+      (creados || []).forEach((c, k) => { if (filasNuevas[k]) filasNuevas[k].dataset.itemId = c.id; nuevos[k].id = c.id; });
+    }
+    const resultados = await Promise.all(itemsEditados.filter((i) => i.id && !nuevos.includes(i)).map((item) =>
       sb.from('ticket_items').update({ nombre_articulo: item.nombre, precio_total: item.precio, categoria_id: item.categoriaId }).eq('id', item.id)));
     const fallo = resultados.find((r) => r.error);
     if (fallo) throw new Error(`Actualizando artículos: ${fallo.error.message}`);
@@ -986,14 +1063,14 @@ async function conformarTicket() {
     const { error: borrarError } = await sb.from('gastos').delete().eq('ticket_id', ticket.id);
     if (borrarError) throw new Error(`Preparando los gastos: ${borrarError.message}`);
     const filasGasto = itemsEditados.map((item) => ({
-      fecha: ticket.fecha, importe: item.precio, categoria_id: item.categoriaId,
+      fecha, importe: item.precio, categoria_id: item.categoriaId,
       descripcion: `${comercio} — ${item.nombre}`, origen: 'ticket', estado: 'confirmado', ticket_id: ticket.id,
     }));
     const { error: gastosError } = await sb.from('gastos').insert(filasGasto);
     if (gastosError) throw new Error(`Creando los gastos: ${gastosError.message}`);
 
     // 3. Ticket confirmado
-    const { error: ticketError } = await sb.from('tickets').update({ comercio, importe_total: totalFinal, estado: 'confirmado' }).eq('id', ticket.id);
+    const { error: ticketError } = await sb.from('tickets').update({ comercio, fecha, importe_total: totalFinal, estado: 'confirmado' }).eq('id', ticket.id);
     if (ticketError) throw new Error(`Marcando el ticket como confirmado: ${ticketError.message}`);
 
     ticketActual = null;
@@ -1170,7 +1247,19 @@ async function cargarDashboard() {
 
   // Periodo anterior, para la comparativa por categoría
   const periodoPrev = calcularPeriodo(addDias(inicioMes, -1));
-  const { data: dataPrev } = await sb.from('gastos').select('*').eq('estado', 'confirmado').gte('fecha', periodoPrev.inicio).lte('fecha', periodoPrev.fin);
+  // Si el periodo está en curso, se compara con los mismos días del periodo anterior
+  const periodoVisto = calcularPeriodo(cursorFecha);
+  let finPrev = periodoPrev.fin;
+  const hintComp = document.getElementById('comparativa-hint');
+  if (periodoVisto.esActual) {
+    const dias = Math.round((new Date(hoyISO() + 'T00:00:00') - new Date(inicioMes + 'T00:00:00')) / 86400000) + 1;
+    const corte = addDias(periodoPrev.inicio, dias - 1);
+    if (corte < finPrev) finPrev = corte;
+    hintComp.textContent = `Comparado con los primeros ${dias} día${dias > 1 ? 's' : ''} del periodo anterior`;
+  } else {
+    hintComp.textContent = 'Comparado con el periodo anterior completo';
+  }
+  const { data: dataPrev } = await sb.from('gastos').select('*').eq('estado', 'confirmado').gte('fecha', periodoPrev.inicio).lte('fecha', finPrev);
   const prevPorCategoria = {};
   (dataPrev || []).filter((g) => modoRosco === 'todo' || !esFijo(g)).forEach((g) => {
     const nombre = nombreCategoria(g.categoria_id);
